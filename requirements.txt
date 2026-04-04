@@ -3,3 +3,6 @@ uvicorn
 Pillow
 python-multipart
 exifread
+piexif
+httpx
+python-dotenv
