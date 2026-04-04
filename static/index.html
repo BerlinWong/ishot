@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shot on iOS - 优雅记录每一次定格</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Using Google Fonts for clean typography if native falls back -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-mesh">
+        <div class="blob c1"></div>
+        <div class="blob c2"></div>
+        <div class="blob c3"></div>
+    </div>
+
+    <main class="container">
+        <header>
+            <div class="logo"></div>
+            <h1>Shot on iOS</h1>
+            <p>基于 EXIF 的高质感照片水印生成器</p>
+        </header>
+
+        <div class="glass-panel" id="upload-panel">
+            <div class="dropzone" id="dropzone">
+                <input type="file" id="file-input" accept="image/jpeg, image/png, image/heic" hidden>
+                <div class="icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                    </svg>
+                </div>
+                <h3>点击或拖拽照片至此</h3>
+                <p>支持 JPG / PNG，我们将自动解析您的相机参数并生成专属底栏</p>
+                <div style="margin-top: 25px;">
+                    <input type="text" id="location-input" class="custom-input" placeholder="添加地理位置 (选填，例如：天目里 · 杭州西湖区)" onclick="event.stopPropagation();">
+                </div>
+            </div>
+            
+            <div class="loader" id="loader" style="display: none;">
+                <div class="spinner"></div>
+                <p>正在生成高品质水印...</p>
+            </div>
+        </div>
+
+        <div class="glass-panel result-panel" id="result-panel" style="display: none;">
+            <div class="preview-container">
+                <img id="result-image" src="" alt="处理后的图片">
+            </div>
+            <div class="actions">
+                <button class="btn btn-secondary" id="btn-back">返回重新上传</button>
+                <button class="btn btn-primary" id="btn-download">下载精修成片</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/main.js"></script>
+</body>
+</html>
