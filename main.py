@@ -13,11 +13,14 @@ from watermark_engine import add_apple_watermark, parse_exif, get_gps_from_exif
 
 app = FastAPI(title="Apple Style Watermark Engine")
 
-app.mount("/static", StaticFiles(directory="/Users/berlin/Documents/workspace/leica-style-watermark/static"), name="static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 def serve_index():
-    return FileResponse("/Users/berlin/Documents/workspace/leica-style-watermark/static/index.html")
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 async def fetch_amap_location(lat: float, lon: float) -> str:
     key = os.getenv("AMAP_KEY", "")
