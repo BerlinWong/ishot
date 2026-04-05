@@ -208,7 +208,7 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     center_y = v_h // 2
     
     # 调优：向下 45px (由 向下 60px 向上回调 15px 得来)
-    y_o = int(35 * v_S) if brand == 'SONY' else 0
+    y_o = int(20 * v_S) if brand == 'SONY' else 0
     tx = int(100 * v_S)
     
     if l_img:
