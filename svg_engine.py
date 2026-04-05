@@ -23,24 +23,22 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     bg_color, t_main, t_sub = (C_BG_DARK, C_MAIN_DARK, "#777777") if is_dark else (C_BG_LIGHT, C_MAIN, C_SUB)
     sig_b64 = get_sig_base64()
     sig_tag = f'<image href="data:image/png;base64,{sig_b64}" x="0" y="0" width="300" height="105" opacity="1.0"/>' if sig_b64 else ""
-    brand = str(camera_make).upper()
+    brand = camera_make.upper() if camera_make else ""
     safe_device = device or "iPhone"
     if brand == 'APPLE' and not safe_device.lower().startswith("shot on"): safe_device = f"Shot on {safe_device}"
     font, bold = "'PingFang SC', 'PingFang', sans-serif", "'PingFang SC Semibold', 'PingFang SC', 'PingFang Bold', sans-serif"
     
     gap = 45
     if brand == 'SONY':
-        # 宽度锁定 200. Scale = 0.2. y 偏移下降到 400 (PNG 超采样尺度) -> SVG 尺度约 133
-        l_w, l_scale, l_y = 200, 0.2, 133
-        logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path d="{SONY_LOGO_PATH}"/></g>'
+        l_w, l_scale, l_y = 200, 0.2, 66
+        # 修正：路径本身自带下降，这里通过内部 translate(0, -170) 来校准路径中心点到 0 位
+        logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path transform="translate(0, -135)" d="{SONY_LOGO_PATH}"/></g>'
+        start_x_logo = 1500 - l_w / 2
     else:
         l_w, l_scale, l_y = 18 * 3.5, 3.5, -55
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path d="{APPLE_LOGO_PATH}"/></g>'
-    
-    sig_w = 300 if sig_tag else 0
-    total_w = l_w + (gap if sig_w else 0) + sig_w
-    start_x = 1500 - total_w / 2
-    if start_x < 500: start_x = 500
+        sig_w = 300 if sig_tag else 0
+        start_x_logo = 1500 - (l_w + gap + sig_w) / 2
         
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 300" width="3000" height="300">
     <rect width="3000" height="300" fill="{bg_color}" />
@@ -48,7 +46,7 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
         <text x="0" y="115" font-family="{bold}" font-weight="bold" font-size="52" fill="{t_main}">{safe_device}</text>
         <text x="0" y="185" font-family="{font}" font-weight="normal" font-size="34" fill="{t_sub}">{params or ""}</text>
     </g>
-    <g transform="translate({start_x}, 150)">
+    <g transform="translate({start_x_logo}, 150)">
         <g fill="{t_main}">{logo_svg}</g>
         <g transform="translate({l_w + gap}, -42)">{sig_tag}</g>
     </g>

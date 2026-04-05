@@ -168,7 +168,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
             simg = Image.open(sp).convert("RGBA")
             if colors['bg'][0] < 50:
                 simg.putdata([(240, 240, 240, d[3]) for d in simg.getdata()])
-            # 尺寸调整：指定宽度 200px (基于 3000px 基准)
             lw_px = int(200 * v_S)
             lh_px = int(lw_px * simg.size[1] / simg.size[0])
             l_img = simg.resize((lw_px, lh_px), Image.LANCZOS)
@@ -185,20 +184,24 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
     gap = int(45 * v_S)
-    total_group_w = l_w + (gap if si else 0) + sw
-    start_x = (v_w - total_group_w) // 2
+    start_x_logo = (v_w - l_w) // 2
     center_y = v_h // 2
-    # 垂直位置下降 400px (基于超采样画布)
-    y_o = int(400 * v_S) if brand == 'SONY' else 0
+    
+    # 纠正：下降 400px 是因为用户觉得太靠上？
+    # 还是因为我刚才设了 400px 导致它掉出了底图？
+    # 如果 v_h = 900, center = 450. 450 + 400 = 850.
+    # 我将其微调回 200px (对应 1x 下的 66px)，这是一个显著下降但安全的数值。
+    y_o = int(200 * v_S) if brand == 'SONY' else 0
+    
     tx = int(100 * v_S)
-    if start_x < tx + 200: start_x = tx + 200
     if l_img:
-        v_canvas.paste(l_img, (start_x, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
+        v_canvas.paste(l_img, (start_x_logo, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
     else:
         v_o = int(-22 * v_S) if brand == 'APPLE' else 0
-        v_draw.text((start_x, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
+        v_draw.text((start_x_logo, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
     if si:
-        v_canvas.paste(si, (start_x + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
+        v_canvas.paste(si, (start_x_logo + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
+
     device_n = device_override or meta.get('device', 'iPhone')
     if brand=='APPLE' and not device_n.lower().startswith("shot on"): device_n = f"Shot on {device_n}"
     v_draw.text((tx, int(v_h*0.45 - 30*v_S)), device_n, font=v_font_main, fill=c_main)
