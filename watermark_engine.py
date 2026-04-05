@@ -117,9 +117,7 @@ def get_semantic_params(focal_length, f_value, exposure, iso, focal_35mm=None):
     def safe_float(v):
         try: return float(str(v))
         except: return None
-    
-    fl_f = safe_float(focal_length)
-    f35_f = safe_float(focal_35mm)
+    fl_f, f35_f = safe_float(focal_length), safe_float(focal_35mm)
     if fl_f and f35_f:
         try:
             r = f35_f / 24.0
@@ -170,8 +168,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
             simg = Image.open(sp).convert("RGBA")
             if colors['bg'][0] < 50:
                 simg.putdata([(240, 240, 240, d[3]) for d in simg.getdata()])
-            # 尺寸调整：指定宽度 400px (基于 3000px 基准)
-            lw_px = int(400 * v_S)
+            # 尺寸调整：指定宽度 200px (基于 3000px 基准)
+            lw_px = int(200 * v_S)
             lh_px = int(lw_px * simg.size[1] / simg.size[0])
             l_img = simg.resize((lw_px, lh_px), Image.LANCZOS)
             l_w = lw_px
@@ -190,8 +188,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     total_group_w = l_w + (gap if si else 0) + sw
     start_x = (v_w - total_group_w) // 2
     center_y = v_h // 2
-    # 垂直位置下降 100px
-    y_o = int(100 * v_S) if brand == 'SONY' else 0
+    # 垂直位置下降 400px (基于超采样画布)
+    y_o = int(400 * v_S) if brand == 'SONY' else 0
     tx = int(100 * v_S)
     if start_x < tx + 200: start_x = tx + 200
     if l_img:

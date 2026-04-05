@@ -30,8 +30,8 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     
     gap = 45
     if brand == 'SONY':
-        # 宽度锁定 400. 1000 -> 400. Scale = 0.4. Height 176 -> 70.4. y 偏移下降到 +100
-        l_w, l_scale, l_y = 400, 0.4, 100
+        # 宽度锁定 200. Scale = 0.2. y 偏移下降到 400 (PNG 超采样尺度) -> SVG 尺度约 133
+        l_w, l_scale, l_y = 200, 0.2, 133
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path d="{SONY_LOGO_PATH}"/></g>'
     else:
         l_w, l_scale, l_y = 18 * 3.5, 3.5, -55
