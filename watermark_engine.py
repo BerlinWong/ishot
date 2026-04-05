@@ -287,7 +287,10 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     v_draw.text((tx, int(v_height*0.45 + 35*v_S)), safe_params, font=v_font_params, fill=c_sub)
     
     # 中央区域：Logo 与 签名作为一个整体水平居中，且各自垂直居中
-    sig_path = os.path.join(STATIC_DIR, "sig.png")
+    # 优先寻找高分辨率签名素材 (sig copy.png)
+    sig_path = os.path.join(STATIC_DIR, "sig copy.png")
+    if not os.path.exists(sig_path):
+        sig_path = os.path.join(STATIC_DIR, "sig.png")
     si = None
     sw = 0
     sh = 0

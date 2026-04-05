@@ -52,10 +52,12 @@ def generate_histogram_svg(thumb_b64: str, color_fill: str = "#b3b3b3") -> str:
         return ""
 
 def get_sig_base64() -> str:
-    path = os.path.join(STATIC_DIR, "sig.png")
-    if os.path.exists(path):
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode("utf-8")
+    # 优先查找高清签名 sig copy.png
+    paths = [os.path.join(STATIC_DIR, "sig copy.png"), os.path.join(STATIC_DIR, "sig.png")]
+    for path in paths:
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
     return ""
 
 def generate_pro_svg(
