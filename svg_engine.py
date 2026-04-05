@@ -28,17 +28,18 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     if brand == 'APPLE' and not safe_device.lower().startswith("shot on"): safe_device = f"Shot on {safe_device}"
     font, bold = "'PingFang SC', 'PingFang', sans-serif", "'PingFang SC Semibold', 'PingFang SC', 'PingFang Bold', sans-serif"
     
-    gap = 45
+    # 显著增加间距
+    gap = 100
     if brand == 'SONY':
-        l_w, l_scale, l_y = 200, 0.2, 0
-        # 下降偏移量微调回 0。同时内部校准路径到垂直中心点。
+        # 宽度锁定 300. Scale = 0.3.
+        l_w, l_scale, l_y = 300, 0.3, 0
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path transform="translate(0, -88)" d="{SONY_LOGO_PATH}"/></g>'
         start_x_logo = 1500 - l_w / 2
     else:
         l_w, l_scale, l_y = 18 * 3.5, 3.5, -55
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path d="{APPLE_LOGO_PATH}"/></g>'
         sig_w = 300 if sig_tag else 0
-        start_x_logo = 1500 - (l_w + gap + sig_w) / 2
+        start_x_logo = 1500 - (l_w + (gap if sig_w else 0) + sig_w) / 2
         
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 300" width="3000" height="300">
     <rect width="3000" height="300" fill="{bg_color}" />

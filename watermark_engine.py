@@ -168,7 +168,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
             simg = Image.open(sp).convert("RGBA")
             if colors['bg'][0] < 50:
                 simg.putdata([(240, 240, 240, d[3]) for d in simg.getdata()])
-            lw_px = int(200 * v_S)
+            # 高度不变（维持之前的比例高度），宽度增加 100px (总 300px)
+            lw_px = int(300 * v_S)
             lh_px = int(lw_px * simg.size[1] / simg.size[0])
             l_img = simg.resize((lw_px, lh_px), Image.LANCZOS)
             l_w = lw_px
@@ -183,26 +184,22 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         sh = int(105 * v_S)
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
-    gap = int(45 * v_S)
     
-    # 居中逻辑保持 Logo 为轴心
+    # 显著增加间距，确保不叠加
+    gap = int(100 * v_S)
+    
     start_x_logo = (v_w - l_w) // 2
     center_y = v_h // 2
-    # 下降偏移量微调回 0
     y_o = 0
-    
     tx = int(100 * v_S)
-    # 关键：如果 Sony 标志右半部不显示，可能是因为 paste 逻辑。
-    # 我们先 paste 标志到背景。
+    
     if l_img:
-        # 使用 simg 本身作为 mask（确保 alpha 透明度正常工作）
         v_canvas.paste(l_img, (start_x_logo, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
     else:
         v_o = int(-22 * v_S) if brand == 'APPLE' else 0
         v_draw.text((start_x_logo, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
-    
-    # 签名紧随其后
     if si:
+        # 签名位置：Logo 右侧 + gap
         v_canvas.paste(si, (start_x_logo + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
 
     device_n = device_override or meta.get('device', 'iPhone')
