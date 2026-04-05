@@ -19,6 +19,21 @@ def _convert_to_degrees(value):
         return d.num / d.den + (m.num / m.den / 60.0) + (s.num / s.den / 3600.0)
     except: return None
 
+def get_gps_from_exif(image_bytes):
+    tags = exifread.process_file(io.BytesIO(image_bytes), details=False)
+    try:
+        if 'GPS GPSLatitude' in tags and 'GPS GPSLongitude' in tags:
+            lat = _convert_to_degrees(tags['GPS GPSLatitude'])
+            lon = _convert_to_degrees(tags['GPS GPSLongitude'])
+            if lat is None or lon is None: return None, None
+            lat_ref = str(tags.get('GPS GPSLatitudeRef', 'N'))
+            lon_ref = str(tags.get('GPS GPSLongitudeRef', 'E'))
+            if 'S' in lat_ref: lat = -lat
+            if 'W' in lon_ref: lon = -lon
+            return lat, lon
+    except: pass
+    return None, None
+
 def get_font(size, bold=False, mono=False, require_chinese=False):
     local_fonts_dir = os.path.join(BASE_DIR, "fonts")
     local_font_candidates = []
@@ -31,6 +46,50 @@ def get_font(size, bold=False, mono=False, require_chinese=False):
             try: return ImageFont.truetype(f_path, size)
             except: pass
     return ImageFont.load_default()
+
+def parse_ios_metadata(info):
+    def find_key(d, target):
+        t = target.lower()
+        if target in d: return d[target]
+        for k in d.keys():
+            if k.lower().replace('{','').replace('}','') == t: return d[k]
+        return {}
+    tiff = find_key(info, "tiff")
+    exif = find_key(info, "exif")
+    gps = find_key(info, "gps")
+    def get_v(keys, default="??"):
+        sources = [gps, exif, tiff, info]
+        for s in sources:
+            if not isinstance(s, dict): continue
+            for k in keys:
+                for sk in s.keys():
+                    if sk.lower() == k.lower(): return s[sk]
+        return default
+    make, model = get_v(["Make"], "Apple"), get_v(["Model"], "iPhone")
+    iso_val = get_v(["ISOSpeedRatings", "ISO"])
+    if isinstance(iso_val, list) and iso_val: iso_val = iso_val[0]
+    exposure, f_num, focal, focal_35 = get_v(["ExposureTime"]), get_v(["FNumber", "ApertureValue"]), get_v(["FocalLength"]), get_v(["FocalLenIn35mmFilm"])
+    date_str = get_v(["DateTimeOriginal", "DateTime"])
+    date_formatted = ""
+    if date_str and date_str != "??":
+        try:
+            dt = datetime.datetime.strptime(str(date_str)[:19], "%Y:%m:%d %H:%M:%S")
+            date_formatted = dt.strftime("%Y.%m.%d %H:%M")
+        except: date_formatted = str(date_str)
+    brightness, width, height = get_v(["BrightnessValue"]), get_v(["PixelXDimension", "PixelWidth", "width"]), get_v(["PixelYDimension", "PixelHeight", "height"])
+    orientation = get_v(["Orientation"], 1)
+    if orientation in [6, 8]: width, height = height, width
+    def safe_f(v): 
+        try: return float(str(v))
+        except: return None
+    return {
+        'make': make, 'model': model,
+        'device': f"{make} {model}".strip() if str(make).lower() not in str(model).lower() else model,
+        'iso': iso_val, 'f_value': f_num, 'exposure': exposure,
+        'focal_length': focal, 'focal_35mm': focal_35,
+        'date': date_formatted, 'brightness': safe_f(brightness),
+        'width': int(float(str(width or 3000))), 'height': int(float(str(height or 2000)))
+    }
 
 def parse_exif(image_bytes):
     if not image_bytes: return {}
@@ -62,7 +121,7 @@ def parse_exif(image_bytes):
     if 'EXIF BrightnessValue' in tags:
         b = tags['EXIF BrightnessValue'].values[0]
         if b.den != 0: bv = b.num / b.den
-    return { 'make': make, 'model': model, 'iso': iso, 'f_value': f_value, 'exposure': exposure, 'focal_length': focal_length, 'focal_35mm': f_35, 'date': date_formatted, 'brightness': bv, 'device': f"{make} {model}".strip() }
+    return { 'make': make, 'model': model, 'device': f"{make} {model}".strip(), 'iso': iso, 'f_value': f_value, 'exposure': exposure, 'focal_length': focal_length, 'focal_35mm': f_35, 'date': date_formatted, 'brightness': bv }
 
 def get_semantic_params(focal_length, f_value, exposure, iso, focal_35mm=None):
     zoom = ""
@@ -89,7 +148,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     else:
         original, meta = None, {'device': device_override or 'iPhone'}
 
-    # 核心修复：如果存在图片，强制底栏宽度与图片宽度 1:1 匹配
     base_w = original.size[0] if original else (base_width or 4000)
     S = base_w / 3000.0
     wm_h = max(158, int(300 * S)) 
