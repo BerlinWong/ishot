@@ -29,17 +29,17 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     font, bold = "'PingFang SC', 'PingFang', sans-serif", "'PingFang SC Semibold', 'PingFang SC', 'PingFang Bold', sans-serif"
     
     # 显著增加间距
-    gap = 100
+    gap = 120
     if brand == 'SONY':
-        # 宽度锁定 300. Scale = 0.3.
-        l_w, l_scale, l_y = 300, 0.3, 0
+        # 宽度锁定 300. 下沉 33px (基于 1D 比例)
+        l_w, l_scale, l_y = 300, 0.3, 33
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path transform="translate(0, -88)" d="{SONY_LOGO_PATH}"/></g>'
         start_x_logo = 1500 - l_w / 2
     else:
         l_w, l_scale, l_y = 18 * 3.5, 3.5, -55
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path d="{APPLE_LOGO_PATH}"/></g>'
         sig_w = 300 if sig_tag else 0
-        start_x_logo = 1500 - (l_w + (gap if sig_w else 0) + sig_w) / 2
+        start_x_logo = 1500 - (l_w + gap + sig_w) / 2
         
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 300" width="3000" height="300">
     <rect width="3000" height="300" fill="{bg_color}" />

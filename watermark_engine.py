@@ -159,23 +159,18 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     v_font_main, v_font_sub = get_font(int(52*v_S), bold=True), get_font(int(34*v_S))
     ref_h = int(115*v_S)
     logo_char = '' if brand=='APPLE' else brand
-    logo_font = get_font(ref_h, bold=(brand!='APPLE'))
-    if brand == 'SONY': logo_font = get_font(int(ref_h*0.85), bold=True)
+    
+    # 彻底弃用 PNG 逻辑，解决裁切与模糊问题
     l_img, l_w, l_h_val = None, 0, 0
+    logo_font = get_font(ref_h, bold=(brand!='APPLE'))
     if brand == 'SONY':
-        sp = os.path.join(STATIC_DIR, "sony.png")
-        if os.path.exists(sp):
-            simg = Image.open(sp).convert("RGBA")
-            if colors['bg'][0] < 50:
-                simg.putdata([(240, 240, 240, d[3]) for d in simg.getdata()])
-            # 高度不变（维持之前的比例高度），宽度增加 100px (总 300px)
-            lw_px = int(300 * v_S)
-            lh_px = int(lw_px * simg.size[1] / simg.size[0])
-            l_img = simg.resize((lw_px, lh_px), Image.LANCZOS)
-            l_w = lw_px
-    if not l_img:
-        l_w = logo_font.getbbox(logo_char)[2] - logo_font.getbbox(logo_char)[0]
-        l_h_val = logo_font.getbbox(logo_char)[3] - logo_font.getbbox(logo_char)[1]
+        # 调试字体大小以匹配约 300px (v_S=1) 宽度
+        logo_font = get_font(int(115 * v_S), bold=True)
+    
+    bbox = logo_font.getbbox(logo_char)
+    l_w = bbox[2] - bbox[0]
+    l_h_val = bbox[3] - bbox[1]
+    
     sig_path = os.path.join(STATIC_DIR, "sig copy.png")
     if not os.path.exists(sig_path): sig_path = os.path.join(STATIC_DIR, "sig.png")
     si, sw, sh = None, 0, 0
@@ -185,21 +180,19 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
     
-    # 显著增加间距，确保不叠加
-    gap = int(100 * v_S)
-    
+    gap = int(120 * v_S) # 间距微调
     start_x_logo = (v_w - l_w) // 2
     center_y = v_h // 2
-    y_o = 0
+    
+    # 下沉 100px
+    y_o = int(100 * v_S) if brand == 'SONY' else 0
     tx = int(100 * v_S)
     
-    if l_img:
-        v_canvas.paste(l_img, (start_x_logo, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
-    else:
-        v_o = int(-22 * v_S) if brand == 'APPLE' else 0
-        v_draw.text((start_x_logo, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
+    # 基准偏移量微调
+    v_o = int(-25 * v_S) if brand == 'APPLE' else int(-15 * v_S)
+    v_draw.text((start_x_logo, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
+    
     if si:
-        # 签名位置：Logo 右侧 + gap
         v_canvas.paste(si, (start_x_logo + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
 
     device_n = device_override or meta.get('device', 'iPhone')
