@@ -285,19 +285,34 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     v_draw.text((tx, int(v_height*0.45 - 30*v_S)), safe_device, font=v_font_main, fill=c_main)
     v_draw.text((tx, int(v_height*0.45 + 35*v_S)), safe_params, font=v_font_params, fill=c_sub)
     
-    # 中央对齐
+    # 中央区域：Logo 与 签名作为一个整体水平居中，且各自垂直居中
     sig_path = os.path.join(STATIC_DIR, "sig.png")
-    sig_w = 0
+    si = None
+    sw = 0
+    sh = 0
     if os.path.exists(sig_path):
         sig = Image.open(sig_path).convert("RGBA")
-        sh = int(120 * v_S)
+        sh = int(105 * v_S) # 签名高度微调，与文字视觉高度更匹配
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
-        v_canvas.paste(si, (v_width//2 + int(30*v_S), int(v_height*0.5 - sh//2)), si)
-        sig_w = sw + 30
     
     y_o = int(10*v_S) if brand=='SONY' else 0
-    v_draw.text((v_width//2 - l_w - (30*v_S if sig_w else 0), int(v_height*0.5 - l_h//2 + y_o)), brand_text, font=v_logo_font, fill=c_main)
+    gap = int(45 * v_S) if si else 0
+    total_group_w = l_w + gap + sw
+    
+    # 计算起始 X，使整个组居中
+    group_start_x = (v_width - total_group_w) // 2
+    
+    # 绘制 Logo
+    logo_x = group_start_x
+    logo_y = int(v_height * 0.5 - l_h // 2 + y_o)
+    v_draw.text((logo_x, logo_y), brand_text, font=v_logo_font, fill=c_main)
+    
+    # 绘制签名
+    if si:
+        sig_x = logo_x + l_w + gap
+        sig_y = int(v_height * 0.5 - sh // 2)
+        v_canvas.paste(si, (sig_x, sig_y), si)
 
     # 右侧日期地址
     rx = v_width - int(100 * v_S)

@@ -68,7 +68,7 @@ def generate_pro_svg(
     camera_make: str = "Apple"
 ) -> str:
     """
-    完全参照 demo.png 布局重新定位，保持与 watermark_engine.py (PNG) 高度对齐。
+    完全参照 demo.png 布局重新定位，对 Logo 和 签名进行整体对齐。
     """
     is_dark = (theme == "dark")
     bg_color = C_BG_DARK if is_dark else C_BG_LIGHT
@@ -76,9 +76,8 @@ def generate_pro_svg(
     t_sub = "#777777" if is_dark else C_SUB
     
     sig_b64 = get_sig_base64()
-    # 签名素材位置同步 (与 PNG 版逻辑对齐)
-    # y=0 为中心线对齐，x 偏移固定
-    sig_tag = f'<image href="data:image/png;base64,{sig_b64}" x="30" y="-60" width="300" opacity="1.0"/>' if sig_b64 else ""
+    # 签名素材高度与 PNG 对齐 (约 105 units)
+    sig_tag = f'<image href="data:image/png;base64,{sig_b64}" x="0" y="0" width="300" height="105" opacity="1.0"/>' if sig_b64 else ""
     
     # 兼容性前缀处理
     brand = str(camera_make).upper()
@@ -90,7 +89,6 @@ def generate_pro_svg(
     safe_date = date_str if date_str else ""
     safe_loc = location if location else "SHANGHAI · CHINA"
     
-    # 字体族：优先指定本地 PingFang 名
     font_family = "'PingFang SC', 'PingFang', sans-serif"
     bold_font_family = "'PingFang SC Semibold', 'PingFang SC', 'PingFang Bold', sans-serif"
     
@@ -108,16 +106,19 @@ def generate_pro_svg(
         </text>
     </g>
     
-    <!-- CENTER ZONE -->
+    <!-- CENTER ZONE: Logo 与 签名作为一个整体水平居中 -->
     <g transform="translate(1500, 150)">
-        <!-- Apple Logo -->
-        <g transform="translate(-100, -35) scale(3.5)" fill="{t_main}">
-            <path d="{APPLE_LOGO_PATH}"/>
-        </g>
-        
-        <!-- 签名素材 -->
-        <g transform="translate(40, 0)">
-            {sig_tag}
+        <!-- 假定总宽约 420 units (Logo~75 + Gap~45 + Sig~300) -->
+        <g transform="translate(-210, 0)">
+            <!-- Apple Logo -->
+            <g transform="translate(0, -35) scale(3.5)" fill="{t_main}">
+                <path d="{APPLE_LOGO_PATH}"/>
+            </g>
+            
+            <!-- 签名素材 (偏移 120, 垂直居中 y = -105/2 ≈ -52) -->
+            <g transform="translate(120, -52)">
+                {sig_tag}
+            </g>
         </g>
     </g>
 
