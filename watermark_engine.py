@@ -4,6 +4,10 @@ import exifread
 import datetime
 import piexif
 from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageOps
+import pillow_heif
+
+# 注册 HEIC 解析器，以便 PIL 可以直接打开 iPhone 的 HEIC 格式图片
+pillow_heif.register_heif_opener()
 
 def get_font(size, bold=False, mono=False, require_chinese=False):
     if require_chinese:

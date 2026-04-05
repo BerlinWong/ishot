@@ -113,4 +113,33 @@ async def process_watermark_v1(
             "Content-Disposition": f'attachment; filename="watermarked_{file.filename}"'
         })
     except Exception as e:
-        return Response(content=str(e), status_code=500)
+        return Response(status_code=500, content=f"Error generating watermark: {str(e)}")
+
+from svg_engine import generate_pro_svg
+
+@app.post("/v1/watermark/svg")
+async def generate_pro_svg_endpoint(
+    device: str = Form(""),
+    params: str = Form(""),
+    date_str: str = Form(""),
+    location: str = Form(None),
+    thumb_b64: Optional[str] = Form(""),
+    theme: Optional[str] = Form("light"),
+    lat: Optional[float] = Form(None),
+    lon: Optional[float] = Form(None)
+):
+    # 动态请求高德地理位置
+    final_loc = location
+    if not final_loc and lat is not None and lon is not None:
+        final_loc = await fetch_amap_location(lat, lon)
+        
+    svg_raw = generate_pro_svg(
+        device=device,
+        params=params,
+        date_str=date_str,
+        location=final_loc or "",
+        thumb_b64=thumb_b64 or "",
+        theme=theme
+    )
+    
+    return Response(content=svg_raw, media_type="image/svg+xml")

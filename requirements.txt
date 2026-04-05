@@ -6,3 +6,4 @@ exifread
 piexif
 httpx
 python-dotenv
+pillow-heif
