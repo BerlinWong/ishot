@@ -54,9 +54,7 @@ def parse_ios_metadata(info):
         for k in d.keys():
             if k.lower().replace('{','').replace('}','') == t: return d[k]
         return {}
-    tiff = find_key(info, "tiff")
-    exif = find_key(info, "exif")
-    gps = find_key(info, "gps")
+    tiff, exif, gps = find_key(info, "tiff"), find_key(info, "exif"), find_key(info, "gps")
     def get_v(keys, default="??"):
         sources = [gps, exif, tiff, info]
         for s in sources:
@@ -95,21 +93,11 @@ def parse_ios_metadata(info):
 def parse_exif(image_bytes):
     if not image_bytes: return {}
     tags = exifread.process_file(io.BytesIO(image_bytes), details=False)
-    make = str(tags.get('Image Make', 'Apple')).strip()
-    model = str(tags.get('Image Model', 'iPhone')).strip()
-    iso = str(tags.get('EXIF ISOSpeedRatings', '??'))
-    f_value = '??'
-    if 'EXIF FNumber' in tags:
-        fn = tags['EXIF FNumber'].values[0]
-        if fn.den != 0: f_value = fn.num / fn.den
-    exposure = 0.01
-    if 'EXIF ExposureTime' in tags:
-        exp = tags['EXIF ExposureTime'].values[0]
-        if exp.den != 0: exposure = exp.num / exp.den
-    focal_length = 24
-    if 'EXIF FocalLength' in tags:
-        fl = tags['EXIF FocalLength'].values[0]
-        if fl.den != 0: focal_length = fl.num / fl.den
+    make, model = str(tags.get('Image Make', 'Apple')).strip(), str(tags.get('Image Model', 'iPhone')).strip()
+    iso, f_value, exposure, focal_length = str(tags.get('EXIF ISOSpeedRatings', '??')), '??', 0.01, 24
+    if 'EXIF FNumber' in tags: f_value = tags['EXIF FNumber'].values[0].num / tags['EXIF FNumber'].values[0].den if tags['EXIF FNumber'].values[0].den != 0 else '??'
+    if 'EXIF ExposureTime' in tags: exposure = tags['EXIF ExposureTime'].values[0].num / tags['EXIF ExposureTime'].values[0].den if tags['EXIF ExposureTime'].values[0].den != 0 else 0.01
+    if 'EXIF FocalLength' in tags: focal_length = tags['EXIF FocalLength'].values[0].num / tags['EXIF FocalLength'].values[0].den if tags['EXIF FocalLength'].values[0].den != 0 else 24
     f_35 = tags.get('EXIF FocalLengthIn35mmFilm')
     f_35 = f_35.values[0] if f_35 else None
     date_str = str(tags.get('EXIF DateTimeOriginal', ''))
@@ -172,8 +160,9 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     ref_h = int(115*v_S)
     logo_char = '' if brand=='APPLE' else brand
     logo_font = get_font(ref_h, bold=(brand!='APPLE'))
-    if brand == 'SONY': logo_font = get_font(int(ref_h*0.85), bold=True)
+    if brand == 'SONY': logo_font = get_font(int(v_ref_h*0.85), bold=True) # fallback font size
     
+    # Logo 资产处理
     l_img, l_w, l_h_val = None, 0, 0
     if brand == 'SONY':
         sp = os.path.join(STATIC_DIR, "sony.png")
@@ -181,7 +170,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
             simg = Image.open(sp).convert("RGBA")
             if colors['bg'][0] < 50:
                 simg.putdata([(240, 240, 240, d[3]) for d in simg.getdata()])
-            lh_px = int(80 * v_S)
+            # 尺寸增大：从 80px 增大到 110px
+            lh_px = int(110 * v_S)
             lw_px = int(lh_px * simg.size[0] / simg.size[1])
             l_img = simg.resize((lw_px, lh_px), Image.LANCZOS)
             l_w = lw_px
@@ -189,6 +179,7 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         l_w = logo_font.getbbox(logo_char)[2] - logo_font.getbbox(logo_char)[0]
         l_h_val = logo_font.getbbox(logo_char)[3] - logo_font.getbbox(logo_char)[1]
 
+    # 签名资产
     sig_path = os.path.join(STATIC_DIR, "sig copy.png")
     if not os.path.exists(sig_path): sig_path = os.path.join(STATIC_DIR, "sig.png")
     si, sw, sh = None, 0, 0
@@ -203,8 +194,13 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     start_x = (v_w - total_group_w) // 2
     center_y = v_h // 2
     
-    y_o = int(-80 * v_S) if brand == 'SONY' else 0
+    # 品牌偏移 (下降调整：从 -80 调整到 -50)
+    y_o = int(-50 * v_S) if brand == 'SONY' else 0
     
+    # 纠偏：如果 group 太长导致左边超出起始点 tx，需要向右平移
+    tx = int(100 * v_S)
+    if start_x < tx + 200: start_x = tx + 200
+
     if l_img:
         v_canvas.paste(l_img, (start_x, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
     else:
@@ -214,15 +210,13 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     if si:
         v_canvas.paste(si, (start_x + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
 
-    tx = int(100 * v_S)
     device_name = device_override or meta.get('device', 'iPhone')
     if brand=='APPLE' and not device_name.lower().startswith("shot on"): device_name = f"Shot on {device_name}"
     v_draw.text((tx, int(v_h*0.45 - 30*v_S)), device_name, font=v_font_main, fill=c_main)
     params_str = params_override or get_semantic_params(kwargs.get('focal_length') or meta.get('focal_length'), kwargs.get('f_value') or meta.get('f_value'), kwargs.get('exposure') or meta.get('exposure'), kwargs.get('iso') or meta.get('iso'), kwargs.get('focal_35mm') or meta.get('focal_35mm'))
     v_draw.text((tx, int(v_h*0.45 + 35*v_S)), params_str, font=v_font_sub, fill=c_sub)
     
-    loc = location or "SHANGHAI · CHINA"
-    fl_font, fs_font = get_font(int(42 * v_S), bold=True, require_chinese=True), get_font(int(34 * v_S), require_chinese=True)
+    loc, fl_font, fs_font = location or "SHANGHAI · CHINA", get_font(int(42*v_S), bold=True, require_chinese=True), get_font(int(34*v_S), require_chinese=True)
     lw = fl_font.getbbox(loc)[2] - fl_font.getbbox(loc)[0]
     v_draw.text((v_w - lw - tx, int(v_h*0.45 - 30*v_S)), loc, font=fl_font, fill=c_main)
     dt_str = date_override or meta.get('date', '')
@@ -232,11 +226,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
 
     if return_bar_only:
         out = io.BytesIO()
-        # 核心修正：返回给快捷指令等外部工具时，确保宽度与底图 1:1 匹配
-        final_bar = v_canvas.resize((base_w, wm_h), Image.LANCZOS)
-        final_bar.save(out, format='PNG')
-        out.seek(0)
-        return out
+        v_canvas.resize((base_w, wm_h), Image.LANCZOS).save(out, format='PNG')
+        out.seek(0); return out
 
     final = Image.new('RGB', (original.size[0], original.size[1] + wm_h))
     final.paste(original, (0,0))
