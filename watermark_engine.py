@@ -136,33 +136,25 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         meta = parse_exif(image_bytes_or_pil if not isinstance(image_bytes_or_pil, Image.Image) else None)
     else:
         original, meta = None, {'device': device_override or 'iPhone'}
-
     base_w = original.size[0] if original else (base_width or 4000)
     S = base_w / 3000.0
     wm_h = max(158, int(300 * S)) 
-    
     bv = meta.get('brightness')
     final_th = theme
     if theme == 'auto' and bv is not None: final_th = 'light' if bv < 0 else ('dark' if bv > 5 else 'light')
-    
     colors = get_theme_colors(original if original else Image.new('RGB',(1,1)), final_th)
     c_main, c_sub = colors['text_main'], colors['text_sub']
-    
     brand_hint = (logo_type or meta.get('make','') + " " + meta.get('device','')).lower()
     brand = 'SONY' if 'sony' in brand_hint else ('LEICA' if 'leica' in brand_hint else 'APPLE')
-
     v_S = S * 3.0 # 超采样 3x
     v_w, v_h = int(base_w * 3), int(wm_h * 3)
     v_canvas = Image.new('RGB', (v_w, v_h), color=colors['bg'])
     v_draw = ImageDraw.Draw(v_canvas)
-
     v_font_main, v_font_sub = get_font(int(52*v_S), bold=True), get_font(int(34*v_S))
     ref_h = int(115*v_S)
     logo_char = '' if brand=='APPLE' else brand
     logo_font = get_font(ref_h, bold=(brand!='APPLE'))
-    if brand == 'SONY': logo_font = get_font(int(v_ref_h*0.85), bold=True) # fallback font size
-    
-    # Logo 资产处理
+    if brand == 'SONY': logo_font = get_font(int(ref_h*0.85), bold=True)
     l_img, l_w, l_h_val = None, 0, 0
     if brand == 'SONY':
         sp = os.path.join(STATIC_DIR, "sony.png")
@@ -170,7 +162,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
             simg = Image.open(sp).convert("RGBA")
             if colors['bg'][0] < 50:
                 simg.putdata([(240, 240, 240, d[3]) for d in simg.getdata()])
-            # 尺寸增大：从 80px 增大到 110px
             lh_px = int(110 * v_S)
             lw_px = int(lh_px * simg.size[0] / simg.size[1])
             l_img = simg.resize((lw_px, lh_px), Image.LANCZOS)
@@ -178,44 +169,33 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     if not l_img:
         l_w = logo_font.getbbox(logo_char)[2] - logo_font.getbbox(logo_char)[0]
         l_h_val = logo_font.getbbox(logo_char)[3] - logo_font.getbbox(logo_char)[1]
-
-    # 签名资产
     sig_path = os.path.join(STATIC_DIR, "sig copy.png")
     if not os.path.exists(sig_path): sig_path = os.path.join(STATIC_DIR, "sig.png")
     si, sw, sh = None, 0, 0
     if os.path.exists(sig_path):
         sig = Image.open(sig_path).convert("RGBA")
         sh = int(105 * v_S)
-        sw = int(sh * sig.size[0] / sig.size[1])
+        sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
-    
     gap = int(45 * v_S)
     total_group_w = l_w + (gap if si else 0) + sw
     start_x = (v_w - total_group_w) // 2
     center_y = v_h // 2
-    
-    # 品牌偏移 (下降调整：从 -80 调整到 -50)
     y_o = int(-50 * v_S) if brand == 'SONY' else 0
-    
-    # 纠偏：如果 group 太长导致左边超出起始点 tx，需要向右平移
     tx = int(100 * v_S)
     if start_x < tx + 200: start_x = tx + 200
-
     if l_img:
         v_canvas.paste(l_img, (start_x, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
     else:
         v_o = int(-22 * v_S) if brand == 'APPLE' else 0
         v_draw.text((start_x, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
-    
     if si:
         v_canvas.paste(si, (start_x + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
-
     device_name = device_override or meta.get('device', 'iPhone')
     if brand=='APPLE' and not device_name.lower().startswith("shot on"): device_name = f"Shot on {device_name}"
     v_draw.text((tx, int(v_h*0.45 - 30*v_S)), device_name, font=v_font_main, fill=c_main)
     params_str = params_override or get_semantic_params(kwargs.get('focal_length') or meta.get('focal_length'), kwargs.get('f_value') or meta.get('f_value'), kwargs.get('exposure') or meta.get('exposure'), kwargs.get('iso') or meta.get('iso'), kwargs.get('focal_35mm') or meta.get('focal_35mm'))
     v_draw.text((tx, int(v_h*0.45 + 35*v_S)), params_str, font=v_font_sub, fill=c_sub)
-    
     loc, fl_font, fs_font = location or "SHANGHAI · CHINA", get_font(int(42*v_S), bold=True, require_chinese=True), get_font(int(34*v_S), require_chinese=True)
     lw = fl_font.getbbox(loc)[2] - fl_font.getbbox(loc)[0]
     v_draw.text((v_w - lw - tx, int(v_h*0.45 - 30*v_S)), loc, font=fl_font, fill=c_main)
@@ -223,12 +203,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     if dt_str:
         dw = fs_font.getbbox(dt_str)[2] - fs_font.getbbox(dt_str)[0]
         v_draw.text((v_w - dw - tx, int(v_h*0.45 + 35*v_S)), dt_str, font=fs_font, fill=c_sub)
-
     if return_bar_only:
-        out = io.BytesIO()
-        v_canvas.resize((base_w, wm_h), Image.LANCZOS).save(out, format='PNG')
-        out.seek(0); return out
-
+        out = io.BytesIO(); v_canvas.resize((base_w, wm_h), Image.LANCZOS).save(out, format='PNG'); out.seek(0); return out
     final = Image.new('RGB', (original.size[0], original.size[1] + wm_h))
     final.paste(original, (0,0))
     final.paste(v_canvas.resize((original.size[0], wm_h), Image.LANCZOS), (0, original.size[1]))
