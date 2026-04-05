@@ -230,16 +230,17 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         if isinstance(image_bytes_or_pil, Image.Image): original = image_bytes_or_pil
         else: original = Image.open(io.BytesIO(image_bytes_or_pil))
         original = ImageOps.exif_transpose(original)
-        base_width = base_width or original.size[0]
         base_height = base_height or original.size[1]
         meta = parse_exif(image_bytes_or_pil if not isinstance(image_bytes_or_pil, Image.Image) else None)
     else:
         original = None
-        base_width, base_height = base_width or 3000, base_height or 2000
+        base_height = base_height or 2000
         meta = {'device': device_override or 'iPhone'}
 
-    S = base_width / 3000.0
-    wm_height = max(150, int(300 * S))
+    # 提高默认分辨率，确保清晰度。基准宽度改为 4000
+    base_width = base_width or (original.size[0] if original else 4000)
+    S = base_width / 3000.0  # 依然以 3000 为比例尺，但实际输出更大
+    wm_height = max(158, int(300 * S)) 
     
     bv = meta.get('brightness')
     final_theme = theme
@@ -254,8 +255,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     if 'leica' in brand_hint: brand = 'LEICA'
     elif 'sony' in brand_hint: brand = 'SONY'
 
-    # 超采样渲染：关键！解决糊的问题
-    render_scale = 2
+    # 超采样渲染：提高到 3x，确保 4000px 下依然极致清晰
+    render_scale = 3
     v_S = S * render_scale
     v_width, v_height = int(base_width * render_scale), int(wm_height * render_scale)
     v_canvas = Image.new('RGB', (v_width, v_height), color=colors['bg'])
@@ -300,18 +301,24 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     gap = int(45 * v_S) if si else 0
     total_group_w = l_w + gap + sw
     
-    # 计算起始 X，使整个组居中
+    # 计算整个组的起始点以实现水平居中
     group_start_x = (v_width - total_group_w) // 2
     
-    # 绘制 Logo
+    # 显式垂直中心 Y 坐标 (在 v_canvas 中)
+    center_y = v_height // 2
+    
+    # 绘制 Logo (计算视觉基准线偏差，确保整体视觉中心对齐)
     logo_x = group_start_x
-    logo_y = int(v_height * 0.5 - l_h // 2 + y_o)
+    # 对于 Apple Logo ()，增加微弱的视觉下移，使其与其他文本基准线平齐
+    v_offset = int(4 * v_S) if brand == 'APPLE' else 0
+    logo_y = int(center_y - l_h // 2 + y_o + v_offset)
     v_draw.text((logo_x, logo_y), brand_text, font=v_logo_font, fill=c_main)
     
     # 绘制签名
     if si:
         sig_x = logo_x + l_w + gap
-        sig_y = int(v_height * 0.5 - sh // 2)
+        # 签名的视觉中心通常比实际图片中心偏上，修正 sh // 2 的偏移量
+        sig_y = int(center_y - sh // 2 + (2 * v_S)) 
         v_canvas.paste(si, (sig_x, sig_y), si)
 
     # 右侧日期地址

@@ -109,17 +109,6 @@ def generate_pro_svg(
     <!-- CENTER ZONE: Logo 与 签名作为一个整体水平居中 -->
     <g transform="translate(1500, 150)">
         <!-- 假定总宽约 420 units (Logo~75 + Gap~45 + Sig~300) -->
-        <g transform="translate(-210, 0)">
-            <!-- Apple Logo -->
-            <g transform="translate(0, -35) scale(3.5)" fill="{t_main}">
-                <path d="{APPLE_LOGO_PATH}"/>
-            </g>
-            
-            <!-- 签名素材 (偏移 120, 垂直居中 y = -105/2 ≈ -52) -->
-            <g transform="translate(120, -52)">
-                {sig_tag}
-            </g>
-        </g>
     </g>
 
     <!-- RIGHT ZONE -->
