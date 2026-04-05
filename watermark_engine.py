@@ -4,7 +4,7 @@ import exifread
 import datetime
 import piexif
 import base64
-from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageOps, ImageChops
 import pillow_heif
 
 # 注册 HEIC 解析器，以便 PIL 可以直接打开 iPhone 的 HEIC 格式图片
@@ -159,17 +159,32 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     v_font_main, v_font_sub = get_font(int(52*v_S), bold=True), get_font(int(34*v_S))
     ref_h = int(115*v_S)
     logo_char = '' if brand=='APPLE' else brand
-    
-    # 彻底弃用 PNG 逻辑，解决裁切与模糊问题
-    l_img, l_w, l_h_val = None, 0, 0
     logo_font = get_font(ref_h, bold=(brand!='APPLE'))
-    if brand == 'SONY':
-        # 调试字体大小以匹配约 300px (v_S=1) 宽度
-        logo_font = get_font(int(115 * v_S), bold=True)
     
-    bbox = logo_font.getbbox(logo_char)
-    l_w = bbox[2] - bbox[0]
-    l_h_val = bbox[3] - bbox[1]
+    l_img, l_w, l_h_val = None, 0, 0
+    # 恢复使用 sony.png
+    if brand == 'SONY':
+        sp = os.path.join(STATIC_DIR, "sony.png")
+        if os.path.exists(sp):
+            s_raw = Image.open(sp).convert("RGBA")
+            # 关键：自动裁剪透明边缘，避免由于 PNG 本身的不对称白边导致“不居中”
+            bg = Image.new('RGBA', s_raw.size, (0,0,0,0))
+            diff = ImageChops.difference(s_raw, bg)
+            bbox = diff.getbbox()
+            if bbox: s_raw = s_raw.crop(bbox)
+            
+            if colors['bg'][0] < 50:
+                s_raw.putdata([(240, 240, 240, d[3]) for d in s_raw.getdata()])
+            
+            lw_px = int(300 * v_S)
+            lh_px = int(lw_px * s_raw.size[1] / s_raw.size[0])
+            l_img = s_raw.resize((lw_px, lh_px), Image.LANCZOS)
+            l_w = lw_px
+            
+    if not l_img:
+        bbox = logo_font.getbbox(logo_char)
+        l_w = bbox[2] - bbox[0]
+        l_h_val = bbox[3] - bbox[1]
     
     sig_path = os.path.join(STATIC_DIR, "sig copy.png")
     if not os.path.exists(sig_path): sig_path = os.path.join(STATIC_DIR, "sig.png")
@@ -180,17 +195,19 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
     
-    gap = int(120 * v_S) # 间距微调
+    gap = int(120 * v_S)
     start_x_logo = (v_w - l_w) // 2
     center_y = v_h // 2
-    
-    # 下沉 100px
+    # 100px 下沉
     y_o = int(100 * v_S) if brand == 'SONY' else 0
     tx = int(100 * v_S)
     
-    # 基准偏移量微调
-    v_o = int(-25 * v_S) if brand == 'APPLE' else int(-15 * v_S)
-    v_draw.text((start_x_logo, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
+    if l_img:
+        # 使用完全裁剪后的图片进行粘贴，并确保使用其 alpha 作为 mask
+        v_canvas.paste(l_img, (start_x_logo, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
+    else:
+        v_o = int(-25 * v_S) if brand == 'APPLE' else int(-15 * v_S)
+        v_draw.text((start_x_logo, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
     
     if si:
         v_canvas.paste(si, (start_x_logo + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
