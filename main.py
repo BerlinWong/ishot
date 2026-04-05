@@ -144,3 +144,4 @@ async def generate_pro_png_bar_endpoint(
         output_io = add_apple_watermark(None, location=location or "CHINA", date_override=date_str or now, theme=theme, logo_type=logo_type, base_width=width, device_override=device, params_override=params)
 
     return Response(content=output_io.read(), media_type="image/png")
+ 
