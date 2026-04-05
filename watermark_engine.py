@@ -184,21 +184,24 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
     gap = int(45 * v_S)
+    
+    # 居中逻辑保持 Logo 为轴心
     start_x_logo = (v_w - l_w) // 2
     center_y = v_h // 2
-    
-    # 纠正：下降 400px 是因为用户觉得太靠上？
-    # 还是因为我刚才设了 400px 导致它掉出了底图？
-    # 如果 v_h = 900, center = 450. 450 + 400 = 850.
-    # 我将其微调回 200px (对应 1x 下的 66px)，这是一个显著下降但安全的数值。
-    y_o = int(200 * v_S) if brand == 'SONY' else 0
+    # 下降偏移量微调回 0
+    y_o = 0
     
     tx = int(100 * v_S)
+    # 关键：如果 Sony 标志右半部不显示，可能是因为 paste 逻辑。
+    # 我们先 paste 标志到背景。
     if l_img:
+        # 使用 simg 本身作为 mask（确保 alpha 透明度正常工作）
         v_canvas.paste(l_img, (start_x_logo, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
     else:
         v_o = int(-22 * v_S) if brand == 'APPLE' else 0
         v_draw.text((start_x_logo, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
+    
+    # 签名紧随其后
     if si:
         v_canvas.paste(si, (start_x_logo + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
 

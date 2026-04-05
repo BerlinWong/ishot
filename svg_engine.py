@@ -30,9 +30,9 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     
     gap = 45
     if brand == 'SONY':
-        l_w, l_scale, l_y = 200, 0.2, 66
-        # 修正：路径本身自带下降，这里通过内部 translate(0, -170) 来校准路径中心点到 0 位
-        logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path transform="translate(0, -135)" d="{SONY_LOGO_PATH}"/></g>'
+        l_w, l_scale, l_y = 200, 0.2, 0
+        # 下降偏移量微调回 0。同时内部校准路径到垂直中心点。
+        logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path transform="translate(0, -88)" d="{SONY_LOGO_PATH}"/></g>'
         start_x_logo = 1500 - l_w / 2
     else:
         l_w, l_scale, l_y = 18 * 3.5, 3.5, -55
