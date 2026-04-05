@@ -162,20 +162,16 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     logo_font = get_font(ref_h, bold=(brand!='APPLE'))
     
     l_img, l_w, l_h_val = None, 0, 0
-    # 恢复使用 sony.png
     if brand == 'SONY':
         sp = os.path.join(STATIC_DIR, "sony.png")
         if os.path.exists(sp):
             s_raw = Image.open(sp).convert("RGBA")
-            # 关键：自动裁剪透明边缘，避免由于 PNG 本身的不对称白边导致“不居中”
             bg = Image.new('RGBA', s_raw.size, (0,0,0,0))
             diff = ImageChops.difference(s_raw, bg)
             bbox = diff.getbbox()
             if bbox: s_raw = s_raw.crop(bbox)
-            
             if colors['bg'][0] < 50:
                 s_raw.putdata([(240, 240, 240, d[3]) for d in s_raw.getdata()])
-            
             lw_px = int(300 * v_S)
             lh_px = int(lw_px * s_raw.size[1] / s_raw.size[0])
             l_img = s_raw.resize((lw_px, lh_px), Image.LANCZOS)
@@ -198,12 +194,14 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     gap = int(120 * v_S)
     start_x_logo = (v_w - l_w) // 2
     center_y = v_h // 2
-    # 100px 下沉
-    y_o = int(100 * v_S) if brand == 'SONY' else 0
+    
+    # 向前复归：向上 100px 是针对当前 100px 下沉的对冲 (回到 0)
+    # 或者用户指的是相对于中心向上 100px?
+    # 根据语境，设为 -100px (向上偏移)
+    y_o = int(-100 * v_S) if brand == 'SONY' else 0
     tx = int(100 * v_S)
     
     if l_img:
-        # 使用完全裁剪后的图片进行粘贴，并确保使用其 alpha 作为 mask
         v_canvas.paste(l_img, (start_x_logo, int(center_y - l_img.size[1] // 2 + y_o)), l_img)
     else:
         v_o = int(-25 * v_S) if brand == 'APPLE' else int(-15 * v_S)
