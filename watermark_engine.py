@@ -47,6 +47,18 @@ def get_font(size, bold=False, mono=False, require_chinese=False):
             except: pass
     return ImageFont.load_default()
 
+def beautify_model(make, model):
+    m, md = str(make).upper(), str(model).strip()
+    if 'SONY' in m:
+        md = md.replace('ILCE-', 'α').replace('7M4', '7 IV').replace('7M3', '7 III').replace('7C2', '7C II').replace('7RM5', '7R V')
+        return md if 'SONY' in md.upper() else f"Sony {md}"
+    if 'LEICA' in m:
+        md = md.replace('LEICA CAMERA AG', '').replace('LEICA', '').strip()
+        return f"Leica {md}"
+    if 'APPLE' in m or 'IPHONE' in md.upper():
+        return md.replace('iPhone', 'iPhone ')
+    return f"{make} {model}".strip() if str(make).lower() not in str(model).lower() else model
+
 def parse_ios_metadata(info):
     def find_key(d, target):
         t = target.lower()
@@ -82,7 +94,7 @@ def parse_ios_metadata(info):
         except: return None
     return {
         'make': make, 'model': model,
-        'device': f"{make} {model}".strip() if str(make).lower() not in str(model).lower() else model,
+        'device': beautify_model(make, model),
         'iso': iso_val, 'f_value': f_num, 'exposure': exposure,
         'focal_length': focal, 'focal_35mm': focal_35,
         'date': date_formatted, 'brightness': safe_f(brightness),
@@ -110,7 +122,7 @@ def parse_exif(image_bytes):
     if 'EXIF BrightnessValue' in tags:
         b = tags['EXIF BrightnessValue'].values[0]
         if b.den != 0: bv = b.num / b.den
-    return { 'make': make, 'model': model, 'device': f"{make} {model}".strip(), 'iso': iso, 'f_value': f_val, 'exposure': exp, 'focal_length': fl, 'focal_35mm': f_35, 'date': date_formatted, 'brightness': bv }
+    return { 'make': make, 'model': model, 'device': beautify_model(make, model), 'iso': iso, 'f_value': f_val, 'exposure': exp, 'focal_length': fl, 'focal_35mm': f_35, 'date': date_formatted, 'brightness': bv }
 
 def get_semantic_params(focal_length, f_value, exposure, iso, focal_35mm=None):
     zoom = ""
@@ -195,10 +207,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     start_x_logo = (v_w - l_w) // 2
     center_y = v_h // 2
     
-    # 向前复归：向上 100px 是针对当前 100px 下沉的对冲 (回到 0)
-    # 或者用户指的是相对于中心向上 100px?
-    # 根据语境，设为 -100px (向上偏移)
-    y_o = int(-100 * v_S) if brand == 'SONY' else 0
+    # 调优：向下 45px (由 向下 60px 向上回调 15px 得来)
+    y_o = int(35 * v_S) if brand == 'SONY' else 0
     tx = int(100 * v_S)
     
     if l_img:

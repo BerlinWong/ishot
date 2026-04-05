@@ -30,8 +30,9 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     
     gap = 120
     if brand == 'SONY':
-        # 向上 33px (对应 100/3)
-        l_w, l_scale, l_y = 300, 0.3, -33
+        # 调优：向下 15px (基于当前位置向上 15px) -> 20 - 5 = 15.
+        # 等于 45 / 3 = 15.
+        l_w, l_scale, l_y = 300, 0.3, 15
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path transform="translate(0, -88)" d="{SONY_LOGO_PATH}"/></g>'
         start_x_logo = 1500 - l_w / 2
     else:
