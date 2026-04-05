@@ -39,17 +39,30 @@ async def fetch_amap_location(lat: float, lon: float) -> str:
                 regeo = data.get("regeocode", {})
                 ac = regeo.get("addressComponent", {})
                 pois = regeo.get("pois", [])
+                
+                # 获取行政区划兜底
+                district = ac.get("district") if not isinstance(ac.get("district"), list) else ""
+                city = ac.get("city") if not isinstance(ac.get("city"), list) else ""
+                suffix = district or city or "CHINA"
+                
                 core_name = ""
-                # 优先级识别
+                # 只有一件事：通过 p_type 强行搜寻隐藏在列表中的“风景名胜/公园”
                 for p in pois:
                     p_type = str(p.get("type", ""))
-                    if any(x in p_type for x in ["风景名胜", "名胜古迹", "公园"]):
+                    if any(x in p_type for x in ["风景名胜", "公园", "名胜古迹"]):
                         core_name = str(p.get("name", ""))
                         break
-                if not core_name and pois: core_name = str(pois[0].get("name", ""))
-                suffix = ac.get("district") or ac.get("city") or ""
-                if core_name: return f"{core_name} · {suffix}"
-                return regeo.get("formatted_address", f"{lat:.2f}, {lon:.2f}")
+                
+                # 如果不是景区，则顺延使用高德推荐的第一位
+                if not core_name and pois:
+                    core_name = str(pois[0].get("name", ""))
+                
+                if core_name:
+                    if suffix and suffix not in core_name:
+                        return f"{core_name} · {suffix}"
+                    return core_name
+                
+                return regeo.get("formatted_address") or f"{lat:.2f}, {lon:.2f}"
     except: pass
     return f"{lat:.4f}, {lon:.4f}"
 
