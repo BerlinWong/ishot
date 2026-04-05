@@ -76,7 +76,8 @@ def get_semantic_params(focal_length, f_value, exposure, iso, focal_35mm=None):
     if f_value: p.append(f"f/{float(str(f_value).replace('f/','')):.2f}")
     if exposure: 
         e = float(exposure)
-        p.append(f"1/{int(1.0/e)}s" if e < 1 else f"{e}s")
+        if e < 1: p.append(f"1/{int(1.0/e)}s")
+        else: p.append(f"{e}s")
     if iso: p.append(f"ISO{int(float(iso))}")
     return "  ".join(p)
 
@@ -88,7 +89,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     else:
         original, meta = None, {'device': device_override or 'iPhone'}
 
-    base_w = base_width or (original.size[0] if original else 4000)
+    # 核心修复：如果存在图片，强制底栏宽度与图片宽度 1:1 匹配
+    base_w = original.size[0] if original else (base_width or 4000)
     S = base_w / 3000.0
     wm_h = max(158, int(300 * S)) 
     
@@ -113,7 +115,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     logo_font = get_font(ref_h, bold=(brand!='APPLE'))
     if brand == 'SONY': logo_font = get_font(int(ref_h*0.85), bold=True)
     
-    # Logo 资产处理
     l_img, l_w, l_h_val = None, 0, 0
     if brand == 'SONY':
         sp = os.path.join(STATIC_DIR, "sony.png")
@@ -129,7 +130,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         l_w = logo_font.getbbox(logo_char)[2] - logo_font.getbbox(logo_char)[0]
         l_h_val = logo_font.getbbox(logo_char)[3] - logo_font.getbbox(logo_char)[1]
 
-    # 签名资产
     sig_path = os.path.join(STATIC_DIR, "sig copy.png")
     if not os.path.exists(sig_path): sig_path = os.path.join(STATIC_DIR, "sig.png")
     si, sw, sh = None, 0, 0
@@ -144,7 +144,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     start_x = (v_w - total_group_w) // 2
     center_y = v_h // 2
     
-    # 品牌偏移 (Sony 向上提 30px)
     y_o = int(-80 * v_S) if brand == 'SONY' else 0
     
     if l_img:
@@ -156,7 +155,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     if si:
         v_canvas.paste(si, (start_x + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
 
-    # 两侧文本
     tx = int(100 * v_S)
     device_name = device_override or meta.get('device', 'iPhone')
     if brand=='APPLE' and not device_name.lower().startswith("shot on"): device_name = f"Shot on {device_name}"
