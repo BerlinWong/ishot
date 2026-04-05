@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2100 960" width="2100" height="960">
+  <!-- 背景透明，文字浅灰色 -->
+  <rect width="2100" height="960" fill="transparent"/>
+  
+  <!-- 第一行左两端对齐：SHOT ON (左)  2026... (右) -->
+  <text x="100" y="380" font-family="'PingFang SC', sans-serif" font-weight="500" font-size="140" fill="#b8b8b8" letter-spacing="0.05em">
+    SHOT ON
+  </text>
+  <text x="2000" y="380" text-anchor="end" font-family="'PingFang SC', sans-serif" font-weight="500" font-size="140" fill="#b8b8b8" letter-spacing="0.05em">
+    2026.4.2 13:00
+  </text>
+  
+  <!-- 第二行文字 (起始与 SHOT ON 对齐) -->
+  <text x="100" y="680" font-family="'PingFang SC', sans-serif" font-weight="500" font-size="140" fill="#b8b8b8" letter-spacing="0.1em">
+    中国 · 江苏 · 苏州 · 观前街
+  </text>
+</svg>

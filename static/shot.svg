@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 150" width="1400" height="150">
+  <!-- 相机模组线框 -->
+  <g transform="translate(30, 20)">
+    <!-- 外框 -->
+    <rect x="0" y="0" width="200" height="110" rx="20" ry="20" fill="none" stroke="#000" stroke-width="2"/>
+    <rect x="5" y="5" width="190" height="100" rx="18" ry="18" fill="none" stroke="#000" stroke-width="1.5"/>
+    
+    <!-- 镜头组 -->
+    <circle cx="40" cy="35" r="20" fill="none" stroke="#000" stroke-width="2"/>
+    <circle cx="40" cy="80" r="20" fill="none" stroke="#000" stroke-width="2"/>
+    <circle cx="90" cy="60" r="20" fill="none" stroke="#000" stroke-width="2"/>
+    
+    <!-- 闪光灯和传感器 -->
+    <circle cx="170" cy="35" r="12" fill="none" stroke="#000" stroke-width="2"/>
+    <circle cx="170" cy="80" r="12" fill="#000"/>
+  </g>
+  
+  <!-- 文字部分 -->
+  <g font-family="'PingFang SC', 'SF Pro Display', Arial, sans-serif" fill="#000">
+    <text x="260" y="70" font-size="72">Shot on iPhone 17 Pro Max</text>
+    <text x="260" y="130" font-size="56" font-weight="200">48MP Pro Fusion camera system</text>
+  </g>
+</svg>
