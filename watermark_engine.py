@@ -230,7 +230,12 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         v_draw.text((v_w - dw - tx, int(v_h*0.45 + 35*v_S)), dt_str, font=fs_font, fill=c_sub)
 
     if return_bar_only:
-        out = io.BytesIO(); v_canvas.save(out, format='PNG'); out.seek(0); return out
+        out = io.BytesIO()
+        # 核心修正：返回给快捷指令等外部工具时，确保宽度与底图 1:1 匹配
+        final_bar = v_canvas.resize((base_w, wm_h), Image.LANCZOS)
+        final_bar.save(out, format='PNG')
+        out.seek(0)
+        return out
 
     final = Image.new('RGB', (original.size[0], original.size[1] + wm_h))
     final.paste(original, (0,0))
