@@ -94,10 +94,10 @@ def parse_exif(image_bytes):
     if not image_bytes: return {}
     tags = exifread.process_file(io.BytesIO(image_bytes), details=False)
     make, model = str(tags.get('Image Make', 'Apple')).strip(), str(tags.get('Image Model', 'iPhone')).strip()
-    iso, f_value, exposure, focal_length = str(tags.get('EXIF ISOSpeedRatings', '??')), '??', 0.01, 24
-    if 'EXIF FNumber' in tags: f_value = tags['EXIF FNumber'].values[0].num / tags['EXIF FNumber'].values[0].den if tags['EXIF FNumber'].values[0].den != 0 else '??'
-    if 'EXIF ExposureTime' in tags: exposure = tags['EXIF ExposureTime'].values[0].num / tags['EXIF ExposureTime'].values[0].den if tags['EXIF ExposureTime'].values[0].den != 0 else 0.01
-    if 'EXIF FocalLength' in tags: focal_length = tags['EXIF FocalLength'].values[0].num / tags['EXIF FocalLength'].values[0].den if tags['EXIF FocalLength'].values[0].den != 0 else 24
+    iso, f_val, exp, fl = str(tags.get('EXIF ISOSpeedRatings', '??')), '??', 0.01, 24
+    if 'EXIF FNumber' in tags: f_val = tags['EXIF FNumber'].values[0].num / tags['EXIF FNumber'].values[0].den if tags['EXIF FNumber'].values[0].den != 0 else '??'
+    if 'EXIF ExposureTime' in tags: exp = tags['EXIF ExposureTime'].values[0].num / tags['EXIF ExposureTime'].values[0].den if tags['EXIF ExposureTime'].values[0].den != 0 else 0.01
+    if 'EXIF FocalLength' in tags: fl = tags['EXIF FocalLength'].values[0].num / tags['EXIF FocalLength'].values[0].den if tags['EXIF FocalLength'].values[0].den != 0 else 24
     f_35 = tags.get('EXIF FocalLengthIn35mmFilm')
     f_35 = f_35.values[0] if f_35 else None
     date_str = str(tags.get('EXIF DateTimeOriginal', ''))
@@ -110,23 +110,31 @@ def parse_exif(image_bytes):
     if 'EXIF BrightnessValue' in tags:
         b = tags['EXIF BrightnessValue'].values[0]
         if b.den != 0: bv = b.num / b.den
-    return { 'make': make, 'model': model, 'device': f"{make} {model}".strip(), 'iso': iso, 'f_value': f_value, 'exposure': exposure, 'focal_length': focal_length, 'focal_35mm': f_35, 'date': date_formatted, 'brightness': bv }
+    return { 'make': make, 'model': model, 'device': f"{make} {model}".strip(), 'iso': iso, 'f_value': f_val, 'exposure': exp, 'focal_length': fl, 'focal_35mm': f_35, 'date': date_formatted, 'brightness': bv }
 
 def get_semantic_params(focal_length, f_value, exposure, iso, focal_35mm=None):
     zoom = ""
-    if focal_35mm:
+    def safe_float(v):
+        try: return float(str(v))
+        except: return None
+    
+    fl_f = safe_float(focal_length)
+    f35_f = safe_float(focal_35mm)
+    if fl_f and f35_f:
         try:
-            r = float(focal_35mm) / 24.0
+            r = f35_f / 24.0
             if r > 0 and r != 1.0: zoom = f"({r:.1f}x)"
         except: pass
     p = []
-    if focal_length: p.append(f"{float(focal_length):.0f}mm {zoom}".strip())
-    if f_value: p.append(f"f/{float(str(f_value).replace('f/','')):.2f}")
-    if exposure: 
-        e = float(exposure)
-        if e < 1: p.append(f"1/{int(1.0/e)}s")
-        else: p.append(f"{e}s")
-    if iso: p.append(f"ISO{int(float(iso))}")
+    if fl_f: p.append(f"{fl_f:.0f}mm {zoom}".strip())
+    fv_f = safe_float(f_value)
+    if fv_f: p.append(f"f/{fv_f:.2f}")
+    exp_f = safe_float(exposure)
+    if exp_f: 
+        if exp_f < 1: p.append(f"1/{int(1.0/exp_f)}s")
+        else: p.append(f"{exp_f}s")
+    iso_f = safe_float(iso)
+    if iso_f: p.append(f"ISO{int(iso_f)}")
     return "  ".join(p)
 
 def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, theme='auto', logo_type="", return_bar_only=False, base_width=None, base_height=None, device_override=None, params_override=None, **kwargs):
@@ -162,8 +170,9 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
             simg = Image.open(sp).convert("RGBA")
             if colors['bg'][0] < 50:
                 simg.putdata([(240, 240, 240, d[3]) for d in simg.getdata()])
-            lh_px = int(110 * v_S)
-            lw_px = int(lh_px * simg.size[0] / simg.size[1])
+            # 尺寸调整：指定宽度 400px (基于 3000px 基准)
+            lw_px = int(400 * v_S)
+            lh_px = int(lw_px * simg.size[1] / simg.size[0])
             l_img = simg.resize((lw_px, lh_px), Image.LANCZOS)
             l_w = lw_px
     if not l_img:
@@ -181,7 +190,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     total_group_w = l_w + (gap if si else 0) + sw
     start_x = (v_w - total_group_w) // 2
     center_y = v_h // 2
-    y_o = int(-50 * v_S) if brand == 'SONY' else 0
+    # 垂直位置下降 100px
+    y_o = int(100 * v_S) if brand == 'SONY' else 0
     tx = int(100 * v_S)
     if start_x < tx + 200: start_x = tx + 200
     if l_img:
@@ -191,11 +201,11 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         v_draw.text((start_x, int(center_y - l_h_val // 2 + y_o + v_o)), logo_char, font=logo_font, fill=c_main)
     if si:
         v_canvas.paste(si, (start_x + l_w + gap, int(center_y - sh // 2 + (12 * v_S))), si)
-    device_name = device_override or meta.get('device', 'iPhone')
-    if brand=='APPLE' and not device_name.lower().startswith("shot on"): device_name = f"Shot on {device_name}"
-    v_draw.text((tx, int(v_h*0.45 - 30*v_S)), device_name, font=v_font_main, fill=c_main)
-    params_str = params_override or get_semantic_params(kwargs.get('focal_length') or meta.get('focal_length'), kwargs.get('f_value') or meta.get('f_value'), kwargs.get('exposure') or meta.get('exposure'), kwargs.get('iso') or meta.get('iso'), kwargs.get('focal_35mm') or meta.get('focal_35mm'))
-    v_draw.text((tx, int(v_h*0.45 + 35*v_S)), params_str, font=v_font_sub, fill=c_sub)
+    device_n = device_override or meta.get('device', 'iPhone')
+    if brand=='APPLE' and not device_n.lower().startswith("shot on"): device_n = f"Shot on {device_n}"
+    v_draw.text((tx, int(v_h*0.45 - 30*v_S)), device_n, font=v_font_main, fill=c_main)
+    p_str = params_override or get_semantic_params(kwargs.get('focal_length') or meta.get('focal_length'), kwargs.get('f_value') or meta.get('f_value'), kwargs.get('exposure') or meta.get('exposure'), kwargs.get('iso') or meta.get('iso'), kwargs.get('focal_35mm') or meta.get('focal_35mm'))
+    v_draw.text((tx, int(v_h*0.45 + 35*v_S)), p_str, font=v_font_sub, fill=c_sub)
     loc, fl_font, fs_font = location or "SHANGHAI · CHINA", get_font(int(42*v_S), bold=True, require_chinese=True), get_font(int(34*v_S), require_chinese=True)
     lw = fl_font.getbbox(loc)[2] - fl_font.getbbox(loc)[0]
     v_draw.text((v_w - lw - tx, int(v_h*0.45 - 30*v_S)), loc, font=fl_font, fill=c_main)

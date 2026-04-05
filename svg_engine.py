@@ -30,8 +30,8 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     
     gap = 45
     if brand == 'SONY':
-        # 高度增加到 110: 110/176 ≈ 0.62. y 偏移下降到 -50
-        l_w, l_scale, l_y = 1000 * 0.62, 0.62, -50
+        # 宽度锁定 400. 1000 -> 400. Scale = 0.4. Height 176 -> 70.4. y 偏移下降到 +100
+        l_w, l_scale, l_y = 400, 0.4, 100
         logo_svg = f'<g transform="translate(0, {l_y}) scale({l_scale})"><path d="{SONY_LOGO_PATH}"/></g>'
     else:
         l_w, l_scale, l_y = 18 * 3.5, 3.5, -55
@@ -40,7 +40,6 @@ def generate_pro_svg(device: str, params: str, date_str: str, location: str, thu
     sig_w = 300 if sig_tag else 0
     total_w = l_w + (gap if sig_w else 0) + sig_w
     start_x = 1500 - total_w / 2
-    # 保护逻辑：如果左边文字太挤，向右平移
     if start_x < 500: start_x = 500
         
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 300" width="3000" height="300">
