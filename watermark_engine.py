@@ -88,6 +88,7 @@ def parse_ios_metadata(info):
         'iso': iso_val, 'f_value': f_num, 'exposure': exposure,
         'focal_length': focal, 'focal_35mm': focal_35,
         'date': date_formatted, 'brightness': safe_f(brightness),
+        'lat': safe_f(get_v(["Latitude"])), 'lon': safe_f(get_v(["Longitude"])),
         'width': int(float(str(width or 3000))), 'height': int(float(str(height or 2000)))
     }
 
