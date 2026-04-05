@@ -3,6 +3,7 @@ import os
 import exifread
 import datetime
 import piexif
+import base64
 from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageOps
 import pillow_heif
 
@@ -34,47 +35,24 @@ def get_gps_from_exif(image_bytes):
     return None, None
 
 def get_font(size, bold=False, mono=False, require_chinese=False):
-    """
-    优先使用本地 ./fonts/ 目录下的字体文件。
-    """
     local_fonts_dir = os.path.join(BASE_DIR, "fonts")
-    
-    # 定义搜索顺序
     local_font_candidates = []
+    if bold: local_font_candidates = ["PingFang Bold.ttf", "PingFang Heavy.ttf", "PingFang Medium.ttf"]
+    elif require_chinese: local_font_candidates = ["PingFang Medium.ttf", "PingFang Regular.ttf"]
+    else: local_font_candidates = ["PingFang Regular.ttf", "PingFang Light.ttf", "PingFang ExtraLight.ttf"]
     
-    if bold:
-        local_font_candidates = ["PingFang Bold.ttf", "PingFang Heavy.ttf", "PingFang Medium.ttf"]
-    elif require_chinese:
-        local_font_candidates = ["PingFang Medium.ttf", "PingFang Regular.ttf"]
-    else:
-        local_font_candidates = ["PingFang Regular.ttf", "PingFang Light.ttf", "PingFang ExtraLight.ttf"]
-    
-    # 1. 尝试本地字体
     for font_name in local_font_candidates:
         f_path = os.path.join(local_fonts_dir, font_name)
         if os.path.exists(f_path):
-            try:
-                return ImageFont.truetype(f_path, size)
+            try: return ImageFont.truetype(f_path, size)
             except: pass
             
-    # 2. 系统残留兜底逻辑 (便携性兼容)
     if require_chinese:
-        paths = [
-            "/System/Library/Fonts/PingFang.ttc",
-            "/System/Library/Fonts/STHeiti Light.ttc",
-            "/System/Library/Fonts/Hiragino Sans GB.ttc",
-            "/Library/Fonts/Arial Unicode.ttf"
-        ]
+        paths = ["/System/Library/Fonts/PingFang.ttc", "/System/Library/Fonts/STHeiti Light.ttc", "/System/Library/Fonts/Hiragino Sans GB.ttc", "/Library/Fonts/Arial Unicode.ttf"]
         index = 1 if bold else 0
-    elif mono:
-        paths = ["/System/Library/Fonts/SFNSMono.ttf", "/System/Library/Fonts/Monaco.ttf", "/System/Library/Fonts/Menlo.ttc"]
-        index = 0
-    elif bold:
-        paths = ["/System/Library/Fonts/SFProDisplay-Bold.ttf", "/System/Library/Fonts/HelveticaNeue.ttc", "/System/Library/Fonts/PingFang.ttc"]
-        index = 1
-    else:
-        paths = ["/System/Library/Fonts/SFProDisplay-Regular.ttf", "/System/Library/Fonts/Helvetica.ttc", "/System/Library/Fonts/PingFang.ttc"]
-        index = 0
+    elif mono: paths, index = ["/System/Library/Fonts/SFNSMono.ttf", "/System/Library/Fonts/Monaco.ttf", "/System/Library/Fonts/Menlo.ttc"], 0
+    elif bold: paths, index = ["/System/Library/Fonts/SFProDisplay-Bold.ttf", "/System/Library/Fonts/HelveticaNeue.ttc", "/System/Library/Fonts/PingFang.ttc"], 1
+    else: paths, index = ["/System/Library/Fonts/SFProDisplay-Regular.ttf", "/System/Library/Fonts/Helvetica.ttc", "/System/Library/Fonts/PingFang.ttc"], 0
         
     for path in paths:
         if os.path.exists(path):
@@ -93,11 +71,9 @@ def parse_ios_metadata(info):
         for k in d.keys():
             if k.lower().replace('{','').replace('}','') == t: return d[k]
         return {}
-
     tiff = find_key(info, "tiff")
     exif = find_key(info, "exif")
     gps = find_key(info, "gps")
-    
     def get_v(keys, default="??"):
         sources = [gps, exif, tiff, info]
         for s in sources:
@@ -106,17 +82,10 @@ def parse_ios_metadata(info):
                 for sk in s.keys():
                     if sk.lower() == k.lower(): return s[sk]
         return default
-
-    make = get_v(["Make"], "Apple")
-    model = get_v(["Model"], "iPhone")
+    make, model = get_v(["Make"], "Apple"), get_v(["Model"], "iPhone")
     iso_val = get_v(["ISOSpeedRatings", "ISO"])
     if isinstance(iso_val, list) and iso_val: iso_val = iso_val[0]
-    
-    exposure = get_v(["ExposureTime"])
-    f_num = get_v(["FNumber", "ApertureValue"])
-    focal = get_v(["FocalLength"])
-    focal_35 = get_v(["FocalLenIn35mmFilm"])
-    
+    exposure, f_num, focal, focal_35 = get_v(["ExposureTime"]), get_v(["FNumber", "ApertureValue"]), get_v(["FocalLength"]), get_v(["FocalLenIn35mmFilm"])
     date_str = get_v(["DateTimeOriginal", "DateTime"])
     date_formatted = ""
     if date_str and date_str != "??":
@@ -124,29 +93,19 @@ def parse_ios_metadata(info):
             dt = datetime.datetime.strptime(str(date_str)[:19], "%Y:%m:%d %H:%M:%S")
             date_formatted = dt.strftime("%Y.%m.%d %H:%M")
         except: date_formatted = str(date_str)
-
-    brightness = get_v(["BrightnessValue"])
-    width = get_v(["PixelXDimension", "PixelWidth", "width"])
-    height = get_v(["PixelYDimension", "PixelHeight", "height"])
+    brightness, width, height = get_v(["BrightnessValue"]), get_v(["PixelXDimension", "PixelWidth", "width"]), get_v(["PixelYDimension", "PixelHeight", "height"])
     orientation = get_v(["Orientation"], 1)
-
     if orientation in [6, 8]: width, height = height, width
-
-    def safe_int(v, default=None):
-        try: return int(float(str(v)))
-        except: return default
-    def safe_float(v, default=None):
+    def safe_f(v): 
         try: return float(str(v))
-        except: return default
-
+        except: return None
     return {
         'make': make, 'model': model,
         'device': f"{make} {model}".strip() if str(make).lower() not in str(model).lower() else model,
         'iso': iso_val, 'f_value': f_num, 'exposure': exposure,
         'focal_length': focal, 'focal_35mm': focal_35,
-        'date': date_formatted, 'brightness': safe_float(brightness),
-        'lat': safe_float(get_v(["Latitude"])), 'lon': safe_float(get_v(["Longitude"])),
-        'width': safe_int(width, 3000), 'height': safe_int(height, 2000)
+        'date': date_formatted, 'brightness': safe_f(brightness),
+        'width': int(float(str(width or 3000))), 'height': int(float(str(height or 2000)))
     }
 
 def get_semantic_params(make, model, focal_length, f_value, exposure, iso, focal_35mm=None):
@@ -156,7 +115,6 @@ def get_semantic_params(make, model, focal_length, f_value, exposure, iso, focal
             ratio = float(focal_35mm) / 24.0
             if ratio > 0 and ratio != 1.0: zoom_str = f"{ratio:.1f}x"
         except: pass
-    
     p_list = []
     if focal_length: 
         try: p_list.append(f"{float(focal_length):.0f}mm")
@@ -174,9 +132,7 @@ def get_semantic_params(make, model, focal_length, f_value, exposure, iso, focal
     if iso: 
         try: p_list.append(f"ISO{int(float(iso))}")
         except: pass
-    
-    params_str = "  ".join(p_list)
-    return "Main Camera", params_str
+    return "Main Camera", "  ".join(p_list)
 
 def parse_exif(image_bytes):
     if not image_bytes: return {}
@@ -198,19 +154,16 @@ def parse_exif(image_bytes):
         if fl.den != 0: focal_length = fl.num / fl.den
     f_35 = tags.get('EXIF FocalLengthIn35mmFilm')
     f_35 = f_35.values[0] if f_35 else None
-    
     date_str = str(tags.get('EXIF DateTimeOriginal', ''))
     date_formatted = date_str
     try:
         dt = datetime.datetime.strptime(date_str[:19], "%Y:%m:%d %H:%M:%S")
         date_formatted = dt.strftime("%Y.%m.%d %H:%M")
     except: pass
-
     bv = None
     if 'EXIF BrightnessValue' in tags:
         b = tags['EXIF BrightnessValue'].values[0]
         if b.den != 0: bv = b.num / b.den
-
     return { 'make': make, 'model': model, 'device': f"{make} {model}".strip(), 'iso': iso, 'f_value': f_value, 'exposure': exposure, 'focal_length': focal_length, 'focal_35mm': f_35, 'date': date_formatted, 'brightness': bv }
 
 def get_text_w(font, text, fallback):
@@ -233,13 +186,11 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         base_height = base_height or original.size[1]
         meta = parse_exif(image_bytes_or_pil if not isinstance(image_bytes_or_pil, Image.Image) else None)
     else:
-        original = None
-        base_height = base_height or 2000
+        original, base_height = None, base_height or 2000
         meta = {'device': device_override or 'iPhone'}
 
-    # 提高默认分辨率，确保清晰度。基准宽度改为 4000
     base_width = base_width or (original.size[0] if original else 4000)
-    S = base_width / 3000.0  # 依然以 3000 为比例尺，但实际输出更大
+    S = base_width / 3000.0
     wm_height = max(158, int(300 * S)) 
     
     bv = meta.get('brightness')
@@ -255,7 +206,6 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     if 'leica' in brand_hint: brand = 'LEICA'
     elif 'sony' in brand_hint: brand = 'SONY'
 
-    # 超采样渲染：提高到 3x，确保 4000px 下依然极致清晰
     render_scale = 3
     v_S = S * render_scale
     v_width, v_height = int(base_width * render_scale), int(wm_height * render_scale)
@@ -264,78 +214,84 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
 
     v_font_main = get_font(int(52 * v_S), bold=True)
     v_font_params = get_font(int(34 * v_S))
-    v_font_loc = get_font(int(42 * v_S), bold=True, require_chinese=True)
-    v_font_sub = get_font(int(34 * v_S), require_chinese=True)
-    
     v_ref_h = int(115 * v_S)
     brand_text = '' if brand=='APPLE' else brand
-    # 如果本地 PingFang 不带苹果 logo，BOLD 模式可能显示更好或使用系统 fallback
     v_logo_font = get_font(v_ref_h, bold=(brand!='APPLE'))
     if brand == 'SONY': v_logo_font = get_font(int(v_ref_h*0.85), bold=True)
     
-    l_w = get_text_w(v_logo_font, brand_text, v_ref_h)
-    l_h = get_text_h(v_logo_font, brand_text, v_ref_h)
+    l_w, l_h = get_text_w(v_logo_font, brand_text, v_ref_h), get_text_h(v_logo_font, brand_text, v_ref_h)
     
+    # Sony 图形资产处理 (防止 NameError)
+    sony_logo = None
+    if brand == 'SONY':
+        sp = os.path.join(STATIC_DIR, "sony.png")
+        if os.path.exists(sp):
+            simg = Image.open(sp).convert("RGBA")
+            if colors['bg'][0] < 50:
+                nd = [(240, 240, 240, d[3]) for d in simg.getdata()]
+                simg.putdata(nd)
+            sh_pixel = int(80 * v_S)
+            sw_pixel = int(sh_pixel * simg.size[0] / simg.size[1])
+            sony_logo = simg.resize((sw_pixel, sh_pixel), Image.LANCZOS)
+            l_w = sw_pixel
+
     safe_device = device_override or meta.get('device', 'iPhone')
     if brand=='APPLE': safe_device = f"Shot on {safe_device}"
     _, safe_params = get_semantic_params(None, None, kwargs.get('focal_length') or meta.get('focal_length'), kwargs.get('f_value') or meta.get('f_value'), kwargs.get('exposure') or meta.get('exposure'), kwargs.get('iso') or meta.get('iso'), kwargs.get('focal_35mm') or meta.get('focal_35mm'))
     safe_params = params_override or safe_params
 
-    # 绘制比例对齐
     tx = int(100 * v_S)
     v_draw.text((tx, int(v_height*0.45 - 30*v_S)), safe_device, font=v_font_main, fill=c_main)
     v_draw.text((tx, int(v_height*0.45 + 35*v_S)), safe_params, font=v_font_params, fill=c_sub)
     
-    # 中央区域：Logo 与 签名作为一个整体水平居中，且各自垂直居中
-    # 优先寻找高分辨率签名素材 (sig copy.png)
     sig_path = os.path.join(STATIC_DIR, "sig copy.png")
-    if not os.path.exists(sig_path):
-        sig_path = os.path.join(STATIC_DIR, "sig.png")
-    si = None
-    sw = 0
-    sh = 0
+    if not os.path.exists(sig_path): sig_path = os.path.join(STATIC_DIR, "sig.png")
+    si, sw, sh = None, 0, 0
     if os.path.exists(sig_path):
         sig = Image.open(sig_path).convert("RGBA")
-        sh = int(105 * v_S) # 签名高度微调，与文字视觉高度更匹配
+        sh = int(105 * v_S)
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
     
-    y_o = int(10*v_S) if brand=='SONY' else 0
-    gap = int(45 * v_S) if si else 0
+    y_o = int(-80 * v_S) if brand == 'SONY' else 0
+    gap = int(45 * v_S) if (si or sony_logo) else 0
     total_group_w = l_w + gap + sw
-    
-    # 计算整个组的起始点以实现水平居中
     group_start_x = (v_width - total_group_w) // 2
-    
-    # 显式垂直中心 Y 坐标 (在 v_canvas 中)
     center_y = v_height // 2
     
-    # 绘制 Logo (计算视觉基准线偏差，确保整体视觉中心对齐)
     logo_x = group_start_x
-    # 对于 Apple Logo ()，继续向上微调 10px 以消除视觉重心下沉
-    v_offset = int(-22 * v_S) if brand == 'APPLE' else 0
-    logo_y = int(center_y - l_h // 2 + y_o + v_offset)
-    v_draw.text((logo_x, logo_y), brand_text, font=v_logo_font, fill=c_main)
+    if sony_logo:
+        v_canvas.paste(sony_logo, (logo_x, int(center_y - sony_logo.size[1] // 2 + y_o)), sony_logo)
+    else:
+        v_offset = int(-22 * v_S) if brand == 'APPLE' else 0
+        v_draw.text((logo_x, int(center_y - l_h // 2 + y_o + v_offset)), brand_text, font=v_logo_font, fill=c_main)
     
-    # 绘制签名
     if si:
-        sig_x = logo_x + l_w + gap
-        # 签名的视觉中心下移 10px 以配合 Logo 调整后的重心
-        sig_y = int(center_y - sh // 2 + (12 * v_S)) 
+        sig_x, sig_y = logo_x + l_w + gap, int(center_y - sh // 2 + (12 * v_S))
         v_canvas.paste(si, (sig_x, sig_y), si)
 
-    # 右侧日期地址
-    rx = v_width - int(100 * v_S)
-    safe_loc = location or "SHANGHAI · CHINA"
-    safe_date = date_override or meta.get('date') or "2026.04.06"
-    lw = get_text_w(v_font_loc, safe_loc, 40*v_S)
-    dw = get_text_w(v_font_sub, safe_date, 30*v_S)
-    v_draw.text((rx - lw, int(v_height*0.45 - 25*v_S)), safe_loc, font=v_font_loc, fill=c_main)
-    v_draw.text((rx - dw, int(v_height*0.45 + 35*v_S)), safe_date, font=v_font_sub, fill=c_sub)
+    safe_loc = location if location else "SHANGHAI · CHINA"
+    v_font_loc = get_font(int(42 * v_S), bold=True, require_chinese=True)
+    v_font_sub = get_font(int(34 * v_S), require_chinese=True)
+    loc_w = get_text_w(v_font_loc, safe_loc, 42*v_S)
+    v_draw.text((v_width - loc_w - tx, int(v_height*0.45 - 30*v_S)), safe_loc, font=v_font_loc, fill=c_main)
+    safe_date = date_override or meta.get('date', '')
+    if safe_date:
+        date_w = get_text_w(v_font_sub, safe_date, 34*v_S)
+        v_draw.text((v_width - date_w - tx, int(v_height*0.45 + 35*v_S)), safe_date, font=v_font_sub, fill=c_sub)
 
-    # 下采样回目标尺寸并输出无损卷轴
-    final_bar = v_canvas.resize((base_width, wm_height), Image.LANCZOS)
+    if return_bar_only:
+        out = io.BytesIO()
+        v_canvas.save(out, format='PNG')
+        out.seek(0)
+        return out
+
+    final_img = Image.new('RGB', (original.size[0], original.size[1] + wm_height))
+    final_img.paste(original, (0,0))
+    bar_res = v_canvas.resize((original.size[0], wm_height), Image.LANCZOS)
+    final_img.paste(bar_res, (0, original.size[1]))
+    
     output = io.BytesIO()
-    final_bar.save(output, format="PNG")
+    final_img.save(output, format='JPEG', quality=95)
     output.seek(0)
     return output
