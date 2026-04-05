@@ -34,6 +34,30 @@ def get_gps_from_exif(image_bytes):
     return None, None
 
 def get_font(size, bold=False, mono=False, require_chinese=False):
+    """
+    优先使用本地 ./fonts/ 目录下的字体文件。
+    """
+    local_fonts_dir = os.path.join(BASE_DIR, "fonts")
+    
+    # 定义搜索顺序
+    local_font_candidates = []
+    
+    if bold:
+        local_font_candidates = ["PingFang Bold.ttf", "PingFang Heavy.ttf", "PingFang Medium.ttf"]
+    elif require_chinese:
+        local_font_candidates = ["PingFang Medium.ttf", "PingFang Regular.ttf"]
+    else:
+        local_font_candidates = ["PingFang Regular.ttf", "PingFang Light.ttf", "PingFang ExtraLight.ttf"]
+    
+    # 1. 尝试本地字体
+    for font_name in local_font_candidates:
+        f_path = os.path.join(local_fonts_dir, font_name)
+        if os.path.exists(f_path):
+            try:
+                return ImageFont.truetype(f_path, size)
+            except: pass
+            
+    # 2. 系统残留兜底逻辑 (便携性兼容)
     if require_chinese:
         paths = [
             "/System/Library/Fonts/PingFang.ttc",
@@ -244,6 +268,7 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     
     v_ref_h = int(115 * v_S)
     brand_text = '' if brand=='APPLE' else brand
+    # 如果本地 PingFang 不带苹果 logo，BOLD 模式可能显示更好或使用系统 fallback
     v_logo_font = get_font(v_ref_h, bold=(brand!='APPLE'))
     if brand == 'SONY': v_logo_font = get_font(int(v_ref_h*0.85), bold=True)
     

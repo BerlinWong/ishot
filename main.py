@@ -70,7 +70,7 @@ async def fetch_amap_location(lat: float, lon: float) -> str:
 async def generate_pro_json_bar_endpoint(
     info: Dict[str, Any],
     theme: str = "light",
-    logo_type: str = "Apple"
+    logo_type: str = ""
 ):
     """
     专门适配 iOS 快捷指令：接收原始 Metadata JSON 并返回无损 PNG 水印条。
@@ -126,7 +126,7 @@ async def generate_pro_png_bar_endpoint(
     location: Optional[str] = Form(None),
     date_str: Optional[str] = Form(None),
     theme: str = Form("light"),
-    logo_type: str = Form("Apple")
+    logo_type: str = Form("")
 ):
     """
     通用 PNG 水印条接口。

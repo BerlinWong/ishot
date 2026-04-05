@@ -68,7 +68,7 @@ def generate_pro_svg(
     camera_make: str = "Apple"
 ) -> str:
     """
-    完全参照 demo.png 布局重新定位
+    完全参照 demo.png 布局重新定位，保持与 watermark_engine.py (PNG) 高度对齐。
     """
     is_dark = (theme == "dark")
     bg_color = C_BG_DARK if is_dark else C_BG_LIGHT
@@ -76,49 +76,39 @@ def generate_pro_svg(
     t_sub = "#777777" if is_dark else C_SUB
     
     sig_b64 = get_sig_base64()
-    # 签名素材强制 1.0 不透明度（纯黑）
-    sig_tag = f'<image href="data:image/png;base64,{sig_b64}" x="10" y="-80" width="300" opacity="1.0"/>' if sig_b64 else ""
+    # 签名素材位置同步 (与 PNG 版逻辑对齐)
+    # y=0 为中心线对齐，x 偏移固定
+    sig_tag = f'<image href="data:image/png;base64,{sig_b64}" x="30" y="-60" width="300" opacity="1.0"/>' if sig_b64 else ""
     
-    hist_svg = generate_histogram_svg(thumb_b64, t_sub)
+    # 兼容性前缀处理
+    brand = str(camera_make).upper()
+    safe_device = device if device else "iPhone"
+    if brand == 'APPLE' and not safe_device.lower().startswith("shot on"):
+        safe_device = f"Shot on {safe_device}"
     
-    safe_device = device if device else "iPhone 17 Pro Max"
-    safe_params = params if params else "48MP Pro Fusion camera system"
-    safe_date = date_str if date_str else "2026.04.02 13:00"
+    safe_params = params if params else ""
+    safe_date = date_str if date_str else ""
     safe_loc = location if location else "SHANGHAI · CHINA"
     
-    # 1. 严格参照布局设计：
-    # 左侧 (X=100)：相机模组绘图 + 两行文本 (Device, Params)
-    # 中间 (X=1500附近)：Logo + 签名 + 直方图
-    # 右侧 (X=2900锚定)：两行文本 (Location, Date)
+    # 字体族：优先指定本地 PingFang 名
+    font_family = "'PingFang SC', 'PingFang', sans-serif"
+    bold_font_family = "'PingFang SC Semibold', 'PingFang SC', 'PingFang Bold', sans-serif"
     
+    # 坐标系基于 3000x300 viewBox
     template = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 300" width="3000" height="300">
     <rect width="3000" height="300" fill="{bg_color}" />
     
-    <!-- LEFT ZONE: 整合了 shot.svg 的经典线框设计 -->
-    <g transform="translate(100, 100)">
-        <!-- 相机模组线框 -->
-        <g transform="scale(0.8) translate(0, -20)">
-            <rect x="0" y="0" width="200" height="110" rx="20" ry="20" fill="none" stroke="{t_main}" stroke-width="2.5"/>
-            <rect x="5" y="5" width="190" height="100" rx="18" ry="18" fill="none" stroke="{t_main}" stroke-width="2"/>
-            <circle cx="40" cy="35" r="20" fill="none" stroke="{t_main}" stroke-width="2.5"/>
-            <circle cx="40" cy="80" r="20" fill="none" stroke="{t_main}" stroke-width="2.5"/>
-            <circle cx="90" cy="60" r="20" fill="none" stroke="{t_main}" stroke-width="2.5"/>
-            <circle cx="170" cy="35" r="12" fill="none" stroke="{t_main}" stroke-width="2.5"/>
-            <circle cx="170" cy="80" r="12" fill="{t_main}"/>
-        </g>
-        
-        <!-- 设备详参，相对于线框右移 -->
-        <g transform="translate(185, 0)">
-            <text x="50" y="40" font-family="'PingFang SC', sans-serif" font-weight="bold" font-size="52" fill="{t_main}">
-                {safe_device}
-            </text>
-            <text x="50" y="105" font-family="'PingFang SC', sans-serif" font-weight="normal" font-size="34" fill="{t_sub}">
-                {safe_params}
-            </text>
-        </g>
+    <!-- LEFT ZONE -->
+    <g transform="translate(100, 0)">
+        <text x="0" y="115" font-family="{bold_font_family}" font-weight="bold" font-size="52" fill="{t_main}">
+            {safe_device}
+        </text>
+        <text x="0" y="185" font-family="{font_family}" font-weight="normal" font-size="34" fill="{t_sub}">
+            {safe_params}
+        </text>
     </g>
     
-    <!-- CENTER ZONE: 严格参照 demo，Logo 居中，签名紧贴 -->
+    <!-- CENTER ZONE -->
     <g transform="translate(1500, 150)">
         <!-- Apple Logo -->
         <g transform="translate(-100, -35) scale(3.5)" fill="{t_main}">
@@ -126,19 +116,19 @@ def generate_pro_svg(
         </g>
         
         <!-- 签名素材 -->
-        <g transform="translate(40, 20)">
+        <g transform="translate(40, 0)">
             {sig_tag}
         </g>
     </g>
 
-    <!-- RIGHT ZONE: 原封不动参照 demo 的右对齐逻辑 -->
-    <g transform="translate(2900, 100)">
+    <!-- RIGHT ZONE -->
+    <g transform="translate(2900, 0)">
         <!-- 地理位置 (首行右对齐) -->
-        <text x="0" y="40" text-anchor="end" font-family="'PingFang SC', sans-serif" font-weight="bold" font-size="42" fill="{t_main}" letter-spacing="0.05em">
+        <text x="0" y="115" text-anchor="end" font-family="{bold_font_family}" font-weight="bold" font-size="42" fill="{t_main}" letter-spacing="0.05em">
             {safe_loc}
         </text>
         <!-- 拍摄日期 (次行右对齐) -->
-        <text x="0" y="105" text-anchor="end" font-family="'PingFang SC', sans-serif" font-weight="normal" font-size="34" fill="{t_sub}">
+        <text x="0" y="185" text-anchor="end" font-family="{font_family}" font-weight="normal" font-size="34" fill="{t_sub}">
             {safe_date}
         </text>
     </g>
