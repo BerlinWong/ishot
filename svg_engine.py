@@ -110,8 +110,8 @@ def generate_pro_svg(
     <g transform="translate(1500, 150)">
         <!-- 假定总宽约 420 units (Logo~75 + Gap~45 + Sig~300) -->
         <g transform="translate(-210, 0)">
-            <!-- Apple Logo (垂直居中, y 修正以修补下划线偏移) -->
-            <g transform="translate(0, -45) scale(3.5)" fill="{t_main}">
+            <!-- Apple Logo (垂直居中, 继续向上偏移 10px) -->
+            <g transform="translate(0, -55) scale(3.5)" fill="{t_main}">
                 <path d="{APPLE_LOGO_PATH}"/>
             </g>
             

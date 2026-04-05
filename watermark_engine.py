@@ -309,8 +309,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     
     # 绘制 Logo (计算视觉基准线偏差，确保整体视觉中心对齐)
     logo_x = group_start_x
-    # 对于 Apple Logo ()，视觉上需要往上提，修正其字模下坠感
-    v_offset = int(-12 * v_S) if brand == 'APPLE' else 0
+    # 对于 Apple Logo ()，继续向上微调 10px 以消除视觉重心下沉
+    v_offset = int(-22 * v_S) if brand == 'APPLE' else 0
     logo_y = int(center_y - l_h // 2 + y_o + v_offset)
     v_draw.text((logo_x, logo_y), brand_text, font=v_logo_font, fill=c_main)
     
