@@ -320,8 +320,8 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     # 绘制签名
     if si:
         sig_x = logo_x + l_w + gap
-        # 签名的视觉中心通常比实际图片中心偏上，修正 sh // 2 的偏移量
-        sig_y = int(center_y - sh // 2 + (2 * v_S)) 
+        # 签名的视觉中心下移 10px 以配合 Logo 调整后的重心
+        sig_y = int(center_y - sh // 2 + (12 * v_S)) 
         v_canvas.paste(si, (sig_x, sig_y), si)
 
     # 右侧日期地址

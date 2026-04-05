@@ -117,8 +117,8 @@ def generate_pro_svg(
                 <path d="{APPLE_LOGO_PATH}"/>
             </g>
             
-            <!-- 签名素材 (偏移 120, 垂直居中 y = -105/2 ≈ -52) -->
-            <g transform="translate(120, -52)">
+            <!-- 签名素材 (往下移动 10px, 原值为 -52, 增加到 -42) -->
+            <g transform="translate(120, -42)">
                 {sig_tag}
             </g>
         </g>
