@@ -70,14 +70,20 @@ async def fetch_amap_location(lat: float, lon: float) -> str:
 async def generate_pro_json_bar_endpoint(
     info: Dict[str, Any],
     theme: str = "light",
-    logo_type: str = ""
+    logo_type: str = "",
+    return_bar: bool = True,
+    thumb_b64: str = ""
 ):
     """
-    专门适配 iOS 快捷指令：接收原始 Metadata JSON 并返回无损 PNG 水印条。
+    专门适配 iOS 快捷指令：接收原始 Metadata JSON 并返回水印图。
     """
     now = datetime.datetime.now().strftime("%Y.%m.%d %H:%M")
     
-    # 自动解包逻辑：应对快捷指令强制转文本的降级行为
+    # 支持从 JSON Root 提取参数
+    final_theme = info.get("theme", theme)
+    final_logo = info.get("logo_type", logo_type)
+    final_thumb = info.get("thumb_b64", thumb_b64)
+    
     target_info = info
     raw_info = info.get("info")
     if raw_info:
@@ -88,7 +94,7 @@ async def generate_pro_json_bar_endpoint(
     
     m = parse_ios_metadata(target_info)
     
-    # 地位置动态解析
+    # 位置动态解析
     f_loc = ""
     def try_float(v):
         try: return float(v)
@@ -97,25 +103,26 @@ async def generate_pro_json_bar_endpoint(
     if c_lat and c_lon:
         f_loc = await fetch_amap_location(c_lat, c_lon)
     f_loc = f_loc or "CHINA"
-    
     output_io = add_apple_watermark(
         None, 
         location=f_loc, 
         date_override=m.get('date') or now, 
-        theme=theme, 
-        logo_type=logo_type, 
-        return_bar_only=True, 
-        base_width=m.get('width') or 3000,
-        base_height=m.get('height') or 2000,
+        theme=final_theme, 
+        logo_type=final_logo, 
+        return_bar_only=return_bar, 
+        base_width=int(float(str(m.get('width') or 3000))), 
+        base_height=int(float(str(m.get('height') or 2000))),
         device_override=m.get('device', 'iPhone'),
         focal_length=m.get('focal_length'),
         f_value=m.get('f_value'),
         exposure=m.get('exposure'),
         iso=m.get('iso'),
-        focal_35mm=m.get('focal_35mm')
+        focal_35mm=m.get('focal_35mm'),
+        thumb_b64=final_thumb
     )
 
-    return Response(content=output_io.read(), media_type="image/png")
+    media_type = "image/png" if return_bar else "image/jpeg"
+    return Response(content=output_io.read(), media_type=media_type)
 
 @app.post("/v1/watermark/png")
 async def generate_pro_png_bar_endpoint(
@@ -126,10 +133,11 @@ async def generate_pro_png_bar_endpoint(
     location: Optional[str] = Form(None),
     date_str: Optional[str] = Form(None),
     theme: str = Form("light"),
-    logo_type: str = Form("")
+    logo_type: str = Form(""),
+    return_bar: bool = Form(True)
 ):
     """
-    通用 PNG 水印条接口。
+    通用接口：支持返回水印条或拼接后的全图。
     """
     now = datetime.datetime.now().strftime("%Y.%m.%d %H:%M")
     if file:
@@ -139,9 +147,11 @@ async def generate_pro_png_bar_endpoint(
             c_lat, c_lon = get_gps_from_exif(contents)
             if c_lat: f_loc = await fetch_amap_location(c_lat, c_lon)
         f_loc = f_loc or "CHINA"
-        output_io = add_apple_watermark(contents, f_loc, date_str, theme, logo_type, return_bar_only=True, base_width=width, device_override=device, params_override=params)
+        # base_width 传入 width 即可，若 contents 有效，engine 会自动以图片实际尺寸为准
+        output_io = add_apple_watermark(contents, f_loc, date_str, theme, logo_type, return_bar_only=return_bar, base_width=width, device_override=device, params_override=params)
     else:
-        output_io = add_apple_watermark(None, location=location or "CHINA", date_override=date_str or now, theme=theme, logo_type=logo_type, base_width=width, device_override=device, params_override=params)
+        output_io = add_apple_watermark(None, location=location or "CHINA", date_override=date_str or now, theme=theme, logo_type=logo_type, return_bar_only=return_bar, base_width=width, device_override=device, params_override=params)
 
-    return Response(content=output_io.read(), media_type="image/png")
+    media_type = "image/png" if return_bar else "image/jpeg"
+    return Response(content=output_io.read(), media_type=media_type)
  

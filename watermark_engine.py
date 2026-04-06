@@ -4,7 +4,8 @@ import exifread
 import datetime
 import piexif
 import base64
-from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageOps, ImageChops
+import random
+from PIL import Image, ImageDraw, ImageFont, ImageStat, ImageOps, ImageChops, ImageFilter
 import pillow_heif
 
 # 注册 HEIC 解析器，以便 PIL 可以直接打开 iPhone 的 HEIC 格式图片
@@ -68,10 +69,14 @@ def parse_ios_metadata(info):
         return {}
     tiff, exif, gps = find_key(info, "tiff"), find_key(info, "exif"), find_key(info, "gps")
     def get_v(keys, default="??"):
-        sources = [gps, exif, tiff, info]
+        # 优先级：根节点 info (通常包含当前实际尺寸) > gps > exif > tiff
+        sources = [info, gps, exif, tiff]
         for s in sources:
             if not isinstance(s, dict): continue
             for k in keys:
+                # 首先尝试完全匹配
+                if k in s: return s[k]
+                # 然后尝试忽略大小写的匹配
                 for sk in s.keys():
                     if sk.lower() == k.lower(): return s[sk]
         return default
@@ -89,6 +94,7 @@ def parse_ios_metadata(info):
     brightness, width, height = get_v(["BrightnessValue"]), get_v(["PixelXDimension", "PixelWidth", "width"]), get_v(["PixelYDimension", "PixelHeight", "height"])
     orientation = get_v(["Orientation"], 1)
     if orientation in [6, 8]: width, height = height, width
+    
     def safe_f(v): 
         try: return float(str(v))
         except: return None
@@ -147,14 +153,21 @@ def get_semantic_params(focal_length, f_value, exposure, iso, focal_35mm=None):
     if iso_f: p.append(f"ISO{int(iso_f)}")
     return "  ".join(p)
 
-def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, theme='auto', logo_type="", return_bar_only=False, base_width=None, base_height=None, device_override=None, params_override=None, **kwargs):
+def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, theme='auto', logo_type="", return_bar_only=False, base_width=None, base_height=None, device_override=None, params_override=None, thumb_b64=None, **kwargs):
     if image_bytes_or_pil is not None:
         original = image_bytes_or_pil if isinstance(image_bytes_or_pil, Image.Image) else Image.open(io.BytesIO(image_bytes_or_pil))
         original = ImageOps.exif_transpose(original)
         meta = parse_exif(image_bytes_or_pil if not isinstance(image_bytes_or_pil, Image.Image) else None)
     else:
         original, meta = None, {'device': device_override or 'iPhone'}
-    base_w = original.size[0] if original else (base_width or 4000)
+        if thumb_b64:
+            try:
+                if ',' in thumb_b64: thumb_b64 = thumb_b64.split(',')[1]
+                original = Image.open(io.BytesIO(base64.b64decode(thumb_b64)))
+            except: pass
+    
+    base_w = original.size[0] if (original and not (base_width and not image_bytes_or_pil)) else (base_width or 4000)
+    if base_width and not image_bytes_or_pil: base_w = base_width
     S = base_w / 3000.0
     wm_h = max(158, int(300 * S)) 
     bv = meta.get('brightness')
@@ -166,7 +179,36 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     brand = 'SONY' if 'sony' in brand_hint else ('LEICA' if 'leica' in brand_hint else 'APPLE')
     v_S = S * 3.0 # 超采样 3x
     v_w, v_h = int(base_w * 3), int(wm_h * 3)
-    v_canvas = Image.new('RGB', (v_w, v_h), color=colors['bg'])
+    
+    # 磨砂质感 (Frosted Glass) 实现
+    if 'glass' in final_th:
+        if original:
+            # 在线模式：采样并模糊
+            sample_h = int(original.height * 0.1)
+            bottom_edge = original.crop((0, original.height - sample_h, original.width, original.height))
+            v_bg = ImageOps.flip(bottom_edge).resize((v_w, v_h), Image.LANCZOS)
+            v_bg = v_bg.filter(ImageFilter.GaussianBlur(radius=int(50 * S)))
+            v_canvas = v_bg.convert('RGBA')
+            alpha = 160 if 'dark' in final_th else 180
+        else:
+            # 离线模式：生成半透明纯色底 (Shortcut 本地叠加会产生透底效果)
+            alpha = 210 if 'dark' in final_th else 230
+            v_canvas = Image.new('RGBA', (v_w, v_h), (colors['bg'][0], colors['bg'][1], colors['bg'][2], 0))
+            
+        # 叠加带有质感的主题色
+        mask = Image.new('RGBA', (v_w, v_h), (colors['bg'][0], colors['bg'][1], colors['bg'][2], alpha))
+        v_canvas = Image.alpha_composite(v_canvas.convert('RGBA'), mask)
+        
+        # 增加磨砂颗粒感 (Grain Noise)
+        pixels = v_canvas.load()
+        for _ in range(int(v_w * v_h * 0.05)): # 5% 的像素点增加噪点
+            rx, ry = random.randint(0, v_w-1), random.randint(0, v_h-1)
+            noise = random.randint(-8, 8)
+            r, g, b, a = pixels[rx, ry]
+            pixels[rx, ry] = (max(0, min(255, r+noise)), max(0, min(255, g+noise)), max(0, min(255, b+noise)), a)
+    else:
+        v_canvas = Image.new('RGB', (v_w, v_h), color=colors['bg'])
+    
     v_draw = ImageDraw.Draw(v_canvas)
     v_font_main, v_font_sub = get_font(int(52*v_S), bold=True), get_font(int(34*v_S))
     ref_h = int(115*v_S)
@@ -199,6 +241,13 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     si, sw, sh = None, 0, 0
     if os.path.exists(sig_path):
         sig = Image.open(sig_path).convert("RGBA")
+        if colors['bg'][0] < 50: # 如果是 Dark 背景，反色签名
+            data = sig.getdata()
+            new_data = []
+            for item in data:
+                if item[3] > 0: new_data.append((255, 255, 255, item[3]))
+                else: new_data.append(item)
+            sig.putdata(new_data)
         sh = int(105 * v_S)
         sw = int(sh * sig.size[0]/sig.size[1])
         si = sig.resize((sw, sh), Image.LANCZOS)
@@ -234,11 +283,31 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
         v_draw.text((v_w - dw - tx, int(v_h*0.45 + 35*v_S)), dt_str, font=fs_font, fill=c_sub)
     if return_bar_only:
         out = io.BytesIO(); v_canvas.resize((base_w, wm_h), Image.LANCZOS).save(out, format='PNG'); out.seek(0); return out
+    
     final = Image.new('RGB', (original.size[0], original.size[1] + wm_h))
     final.paste(original, (0,0))
     final.paste(v_canvas.resize((original.size[0], wm_h), Image.LANCZOS), (0, original.size[1]))
-    output = io.BytesIO(); final.save(output, format='JPEG', quality=95); output.seek(0); return output
+    
+    # 核心修复：EXIF 注入
+    exif_bytes = None
+    if isinstance(image_bytes_or_pil, bytes):
+        try:
+            exif_dict = piexif.load(image_bytes_or_pil)
+            if "0th" in exif_dict:
+                exif_dict["0th"][piexif.ImageIFD.ImageWidth] = final.width
+                exif_dict["0th"][piexif.ImageIFD.ImageLength] = final.height
+                exif_dict["0th"][piexif.ImageIFD.Orientation] = 1 
+            if "Exif" in exif_dict:
+                exif_dict["Exif"][piexif.ExifIFD.PixelXDimension] = final.width
+                exif_dict["Exif"][piexif.ExifIFD.PixelYDimension] = final.height
+            exif_bytes = piexif.dump(exif_dict)
+        except: pass
+
+    output = io.BytesIO()
+    final.save(output, format='JPEG', quality=95, exif=exif_bytes) if exif_bytes else final.save(output, format='JPEG', quality=95)
+    output.seek(0)
+    return output
 
 def get_theme_colors(image, theme):
-    if theme == 'dark': return { 'bg': (5,5,5), 'text_main': (240,240,240), 'text_sub': (119,119,119) }
+    if 'dark' in theme: return { 'bg': (27,28,30), 'text_main': (240,240,240), 'text_sub': (119,119,119) }
     return { 'bg': (255,255,255), 'text_main': (0,0,0), 'text_sub': (153,153,153) }
