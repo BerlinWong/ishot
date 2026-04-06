@@ -57,7 +57,8 @@ def beautify_model(make, model):
         md = md.replace('LEICA CAMERA AG', '').replace('LEICA', '').strip()
         return f"Leica {md}"
     if 'APPLE' in m or 'IPHONE' in md.upper():
-        return md.replace('iPhone', 'iPhone ')
+        res = md.replace('Apple', '').replace('iPhone', '').strip()
+        return f"Apple iPhone {res}"
     return f"{make} {model}".strip() if str(make).lower() not in str(model).lower() else model
 
 def parse_ios_metadata(info):
