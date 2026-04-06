@@ -280,5 +280,5 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     return output
 
 def get_theme_colors(image, theme):
-    if 'dark' in theme: return { 'bg': (59,59,59), 'text_main': (255,255,255), 'text_sub': (230,230,230) }
+    if 'dark' in theme: return { 'bg': (27,28,30), 'text_main': (255,255,255), 'text_sub': (230,230,230) }
     return { 'bg': (255,255,255), 'text_main': (0,0,0), 'text_sub': (153,153,153) }
