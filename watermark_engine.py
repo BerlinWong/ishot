@@ -195,17 +195,15 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
             alpha = 210 if 'dark' in final_th else 230
             v_canvas = Image.new('RGBA', (v_w, v_h), (colors['bg'][0], colors['bg'][1], colors['bg'][2], 0))
             
-        # 叠加带有质感的主题色
+        # 叠加带有质感的主题色 (RGBA 合并)
         mask = Image.new('RGBA', (v_w, v_h), (colors['bg'][0], colors['bg'][1], colors['bg'][2], alpha))
         v_canvas = Image.alpha_composite(v_canvas.convert('RGBA'), mask)
         
-        # 增加磨砂颗粒感 (Grain Noise)
-        pixels = v_canvas.load()
-        for _ in range(int(v_w * v_h * 0.05)): # 5% 的像素点增加噪点
-            rx, ry = random.randint(0, v_w-1), random.randint(0, v_h-1)
-            noise = random.randint(-8, 8)
-            r, g, b, a = pixels[rx, ry]
-            pixels[rx, ry] = (max(0, min(255, r+noise)), max(0, min(255, g+noise)), max(0, min(255, b+noise)), a)
+        # 增加磨砂颗粒感 (Grain Noise) - 极速版 (利用底层 C 运算，数万次循环合并为 1 次底层计算)
+        noise_raw = os.urandom(v_w * v_h)
+        noise_img = Image.frombuffer('L', (v_w, v_h), noise_raw, 'raw', 'L', 0, 1)
+        noise_img = ImageOps.colorize(noise_img, (0,0,0), (50,50,50)).convert("RGBA")
+        v_canvas = ImageChops.soft_light(v_canvas, noise_img)
     else:
         v_canvas = Image.new('RGB', (v_w, v_h), color=colors['bg'])
     
