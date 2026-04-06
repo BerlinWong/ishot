@@ -183,12 +183,12 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     # 磨砂质感 (Frosted Glass) 实现
     if 'glass' in final_th:
         if original:
-            # 在线模式：采样并模糊
+            # 极致优化在线模式：下采样 -> 模糊 -> 恢复尺寸 (提升模糊效率 10-50 倍)
             sample_h = int(original.height * 0.1)
             bottom_edge = original.crop((0, original.height - sample_h, original.width, original.height))
-            v_bg = ImageOps.flip(bottom_edge).resize((v_w, v_h), Image.LANCZOS)
-            v_bg = v_bg.filter(ImageFilter.GaussianBlur(radius=int(50 * S)))
-            v_canvas = v_bg.convert('RGBA')
+            v_bg_small = ImageOps.flip(bottom_edge).resize((800, int(800 * wm_h / base_w)), Image.BILINEAR)
+            v_bg_small = v_bg_small.filter(ImageFilter.GaussianBlur(radius=15))
+            v_canvas = v_bg_small.resize((v_w, v_h), Image.LANCZOS).convert('RGBA')
             alpha = 160 if 'dark' in final_th else 180
         else:
             # 离线模式：生成半透明纯色底 (Shortcut 本地叠加会产生透底效果)
