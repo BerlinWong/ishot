@@ -179,34 +179,7 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     brand = 'SONY' if 'sony' in brand_hint else ('LEICA' if 'leica' in brand_hint else 'APPLE')
     v_S = S * 3.0 # 超采样 3x
     v_w, v_h = int(base_w * 3), int(wm_h * 3)
-    
-    # 磨砂质感 (Frosted Glass) 实现
-    if 'glass' in final_th:
-        if original:
-            # 极致优化在线模式：下采样 -> 模糊 -> 恢复尺寸 (提升模糊效率 10-50 倍)
-            sample_h = int(original.height * 0.1)
-            bottom_edge = original.crop((0, original.height - sample_h, original.width, original.height))
-            v_bg_small = ImageOps.flip(bottom_edge).resize((800, int(800 * wm_h / base_w)), Image.BILINEAR)
-            v_bg_small = v_bg_small.filter(ImageFilter.GaussianBlur(radius=15))
-            v_canvas = v_bg_small.resize((v_w, v_h), Image.LANCZOS).convert('RGBA')
-            alpha = 160 if 'dark' in final_th else 180
-        else:
-            # 离线模式：生成半透明纯色底 (Shortcut 本地叠加会产生透底效果)
-            alpha = 210 if 'dark' in final_th else 230
-            v_canvas = Image.new('RGBA', (v_w, v_h), (colors['bg'][0], colors['bg'][1], colors['bg'][2], 0))
-            
-        # 叠加带有质感的主题色 (RGBA 合并)
-        mask = Image.new('RGBA', (v_w, v_h), (colors['bg'][0], colors['bg'][1], colors['bg'][2], alpha))
-        v_canvas = Image.alpha_composite(v_canvas.convert('RGBA'), mask)
-        
-        # 增加磨砂颗粒感 (Grain Noise) - 极速版 (利用底层 C 运算，数万次循环合并为 1 次底层计算)
-        noise_raw = os.urandom(v_w * v_h)
-        noise_img = Image.frombuffer('L', (v_w, v_h), noise_raw, 'raw', 'L', 0, 1)
-        noise_img = ImageOps.colorize(noise_img, (0,0,0), (50,50,50)).convert("RGBA")
-        v_canvas = ImageChops.soft_light(v_canvas, noise_img)
-    else:
-        v_canvas = Image.new('RGB', (v_w, v_h), color=colors['bg'])
-    
+    v_canvas = Image.new('RGB', (v_w, v_h), color=colors['bg'])
     v_draw = ImageDraw.Draw(v_canvas)
     v_font_main, v_font_sub = get_font(int(52*v_S), bold=True), get_font(int(34*v_S))
     ref_h = int(115*v_S)
@@ -239,7 +212,7 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     si, sw, sh = None, 0, 0
     if os.path.exists(sig_path):
         sig = Image.open(sig_path).convert("RGBA")
-        if colors['bg'][0] < 50: # 如果是 Dark 背景，反色签名
+        if colors['bg'][0] < 100: # 如果是 Dark 背景 (#3b3b3b)，反色签名
             data = sig.getdata()
             new_data = []
             for item in data:
@@ -307,5 +280,5 @@ def add_apple_watermark(image_bytes_or_pil, location="", date_override=None, the
     return output
 
 def get_theme_colors(image, theme):
-    if 'dark' in theme: return { 'bg': (27,28,30), 'text_main': (240,240,240), 'text_sub': (119,119,119) }
+    if 'dark' in theme: return { 'bg': (59,59,59), 'text_main': (255,255,255), 'text_sub': (230,230,230) }
     return { 'bg': (255,255,255), 'text_main': (0,0,0), 'text_sub': (153,153,153) }
